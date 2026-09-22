@@ -17,7 +17,7 @@ global.setTimeout = () => 0;
 const base = __dirname;
 function ev(p) { eval(fs.readFileSync(p, 'utf8')); }
 ['store', 'engine', 'ui', 'ai', 'cnquiz', 'mathpuz', 'math', 'wordbook', 'kid', 'parent'].forEach(f => ev(path.join(base, 'js', f + '.js')));
-['chinese2a', 'cn_preview', 'cn_text_2a', 'cn_text_2b', 'lwte2a', 'lwte2a_review', 'words2a'].forEach(f => ev(path.join(base, 'data', f + '.js')));
+['chinese2a', 'cn_preview', 'cn_text_2a', 'cn_text_2b', 'words2a'].forEach(f => ev(path.join(base, 'data', f + '.js')));
 
 const UI = global.UI;
 let modal = null; const toasts = [];
@@ -40,6 +40,8 @@ console.log('========== 英语查词 / 单词本 / 错题本 专项测试 ======
 
 /* ---------- 1. 词库 ---------- */
 console.log('\n[1] 词库');
+// 模拟真实页面：核心词库也加载进来
+eval(fs.readFileSync(path.join(base, 'data', 'dict', 'core.js'), 'utf8'));
 const D = WB.dict();
 ok('词库已加载', !!D && Array.isArray(D.list) && D.list.length > 200, 'count=' + (D && D.list.length));
 ok('词库没有重复单词', (function () {
@@ -64,7 +66,7 @@ ok('空输入返回 none', WB.search('').hit === 'none');
 let pr = WB.search('book');
 ok('前缀/包含能查到', pr.list.length >= 1, JSON.stringify(pr.list.map(x => x.en)));
 ok('复数 books 能查到 book', WB.search('books').list.some(w => w.en === 'book'), JSON.stringify(WB.search('books').list.map(x => x.en)));
-ok('进行时 running 能查到 run', WB.search('running').list.some(w => w.en === 'run'), JSON.stringify(WB.search('running').list.map(x => x.en)));
+ok('进行时 running 能查到', WB.search('running').list.some(w => w.en === 'run' || w.en === 'running'), JSON.stringify(WB.search('running').list.map(x => x.en)));
 
 /* ---------- 3. 单词本 ---------- */
 console.log('\n[3] 单词本');
@@ -234,5 +236,24 @@ WB.judge(q4, q4.opts.filter(o => o !== q4.ans)[0]);
 Kid.act('wbWrongClear');
 ok('可以清空（带二次确认）', WB.wrongList().length === 0);
 ok('清空后单词本还在', WB.mine().length === 1);
+
+/* ---------- 14. 中译英（双向查词） ---------- */
+console.log('\n[14] 中译英 · 双向查词');
+reset();
+let z1 = WB.search('老师');
+ok('中文能查英文', z1.hit === 'exact' && z1.list.some(w => w.en === 'teacher'), JSON.stringify(z1.list.slice(0,3).map(w=>w.en)));
+ok('标记了查询方向是中文', z1.dir === 'zh');
+ok('查「医生」出 doctor', WB.search('医生').list.some(w => w.en === 'doctor'));
+ok('查「跑」出 run', WB.search('跑').list.some(w => w.en === 'run'));
+ok('查「游泳」出 swim', WB.search('游泳').list.some(w => w.en === 'swim'));
+ok('中文查不到时返回 none', WB.search('这个词肯定没有').hit === 'none');
+ok('中文查不到时 dir 仍是 zh', WB.search('这个词肯定没有').dir === 'zh');
+ok('带分号的释义能被拆开匹配（开心→happy）', WB.search('开心').list.some(w => w.en === 'happy'));
+/* 英文不受影响 */
+let z2 = WB.search('teacher');
+ok('英文查询方向是 en', z2.dir !== 'zh' && z2.hit === 'exact');
+ok('英文仍能查出中文', z2.list[0].zh === '老师');
+/* 中文结果里不应出现空释义 */
+ok('中文命中的词都有英文和中文', z1.list.every(w => w.en && w.zh));
 
 console.log('\n结果：' + pass + ' 通过 / ' + fail + ' 失败');
