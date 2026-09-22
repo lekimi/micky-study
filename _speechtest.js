@@ -65,10 +65,13 @@ ok('第一轮问的是情节（先解决一句大白话）', g1.key === 'plot', 
 let g2 = SC.nextGuide('今天我和小明玩', ['plot']);
 ok('问过的维度不再问', g2.key !== 'plot', g2 && g2.key);
 let askedAll = SC.GUIDE.map(g => g.key);
-let gAll = SC.nextGuide('今天我和小明玩', askedAll.slice(0, 7));
+let gAll = SC.nextGuide('今天我和小明玩', askedAll.slice(0, 7), 8);
 ok('只剩一个没问时还能问', !!gAll);
-let gNone = SC.nextGuide('今天我和小明玩', askedAll);
+let gNone = SC.nextGuide('今天我和小明玩', askedAll, 8);
 ok('全问完了返回 null（可以收尾）', gNone === null);
+ok('默认一轮最多问 4 句（不让孩子耗太久）', SC.MAX_ROUND === 4);
+ok('问够 4 句就返回 null', SC.nextGuide('今天我和小明玩', askedAll.slice(0, 4)) === null);
+ok('孩子点了「再问一轮」可以多问一句', !!SC.nextGuide('今天我和小明玩', askedAll.slice(0, 4), 5));
 /* 已经写到的维度自动跳过 */
 let gSkip = SC.nextGuide('我今天看到一只很漂亮的蝴蝶，心里特别开心', []);
 ok('已写到「看到」就不会再问看到', gSkip.key !== 'see', gSkip && gSkip.key);
@@ -115,16 +118,20 @@ ok('提交后清掉草稿', E.speechDraftOf(S.dateStr()) === null);
 ok('记下了扩写前的原文', fin.rec.origin === '今天我和小明玩');
 ok('记下了扩写后文本', fin.rec.text.length > fin.rec.origin.length);
 
-/* ---------- 5. 每日次数上限 ---------- */
-console.log('\n[5] 每日上限与第二次减半');
-ok('每天最多 2 次', E.SPEECH_DAILY_MAX === 2);
-ok('第 1 次后可以再提交', E.speechCanSubmit(S.dateStr()) === true);
+/* ---------- 5. 每天一篇 + 「接着补一补」（原「再讲一件事」已合并） ---------- */
+console.log('\n[5] 每天一篇 + 接着补一补');
+ok('每天只讲一篇', E.SPEECH_DAILY_MAX === 1);
+ok('讲完一篇后不能再开新篇', E.speechCanSubmit(S.dateStr()) === false);
+ok('但可以把同一篇接着补', E.speechCanRework(S.dateStr()) === true);
 let w1 = S.state.water;
 let res2 = SC.scoreV2(long, long);
-let fin2 = E.finishSpeech2(long, long, res2, S.dateStr());
-ok('第 2 次水滴减半', fin2.water < fin.water || fin.water <= 1, fin.water + ' → ' + fin2.water);
-ok('第 2 次不给阳光', fin2.sun === 0);
-ok('2 次后不能再提交', E.speechCanSubmit(S.dateStr()) === false);
+let fin2 = E.finishSpeech2(long, long, res2, S.dateStr(), { cont: true });
+ok('补写：分数取更高的一次', fin2.rec.score >= fin.rec.score, fin.rec.score + ' → ' + fin2.rec.score);
+ok('补写：不新增一条记录', E.speechCountToday(S.dateStr()) === 1);
+ok('补写：水滴只补差额，不会重复发', fin2.water <= 5, 'water=' + fin2.water);
+ok('补写：次数被记下来', (fin2.rec.reworks || 0) === 1);
+E.finishSpeech2(long, long, res2, S.dateStr(), { cont: true });
+ok('补写 2 次后不能再补', E.speechCanRework(S.dateStr()) === false);
 ok('超过上限时提交被拦', (function () {
   const before = S.state.water;
   Kid.act('speechSubmit');
