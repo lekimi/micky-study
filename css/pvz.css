@@ -919,3 +919,37 @@
 .timer-tick { font-variant-numeric: tabular-nums; }
 /* 选项选中态（造句/概括也用） */
 .cn-opt.on { background:#FFD54A !important; border-color:#E8A317 !important; color:#4A3410 !important; }
+
+/* ===========================================================
+   平板适配（≥860px：华为 MatePad Pro / 大屏平板、横屏）
+   目标：内容列从 760 → 960px，把大屏填满、两侧不留大片空白。
+   字号只做 +1px 的微调：小字（说明/标签）稍微抬一点便于远距离看，
+   标题、按钮、大号分数一律不动，避免"字太大、一屏装不下"。
+   =========================================================== */
+@media (min-width: 860px) {
+  .app-shell { max-width: 960px; }
+
+  /* 顶部条：横向空间多了，左右留白加大一点 */
+  .app-root .topbar { padding: 12px 22px; }
+  .app-root .topbar .tb-title { font-size: 21px; }
+  .app-root .topbar .tb-sub { font-size: 13px; }
+
+  /* 卡片：内边距略增，行距更松，读起来不挤 */
+  .app-root .card { padding: 16px; border-radius: 20px; }
+  .app-root .sec-title { font-size: 16px; margin: 0 0 10px; }
+
+  /* 小字 +1px（说明性文字在平板上偏小，抬一档） */
+  .app-root .muted { font-size: 13px; }
+  .app-root .field-label { font-size: 13px; }
+  .app-root .field { padding: 13px 16px; }
+
+  /* 按钮保持原有尺寸：孩子手指点的东西不再放大，只加一点点间距 */
+  .app-root .btn { padding: 12px 24px; }
+
+  /* 资源条 / 步骤条：跟着变宽，不拉伸变形 */
+  .app-root .res-chip .rc-val { font-size: 20px; }
+  .app-root .res-chip .rc-label { font-size: 12px; }
+
+  /* 输入框（讲述/看图写话）在平板上给足高度，方便打字和手写 */
+  textarea.field { min-height: 120px; }
+}
