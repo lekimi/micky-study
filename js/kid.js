@@ -222,6 +222,9 @@
           if (t.early && !ended && earlyMin > 0) {
             subLine += '<div style="margin-top:4px"><span class="task-tag water">⚡ 现在结束，还能多拿 💧' + earlyMin + '</span></div>';
           }
+          if (!ended && Kid.wakeSupported()) {
+            subLine += '<div class="muted" style="margin-top:3px;font-weight:700;color:#8A6D3B">🔆 屏幕会保持亮着，到点会提醒你</div>';
+          }
           /* 四面八方要去别的 App 打卡：告诉孩子可以离开本页，时间照样走 */
           if (t.id === 'f4' && !ended) {
             subLine += '<div class="muted" style="margin-top:4px;font-weight:800;color:#2E7CA8">点「开始计时」后，可以去四面八方 App 打卡，时间照样走；' +
@@ -1808,6 +1811,45 @@
     earlyMinutes: function (taskId) {
       return Math.floor(Kid.timerLeftSec(taskId) / 60);
     },
+
+    /* ============ 屏幕常亮（倒计时期间不让平板息屏） ============
+       华为 MatePad Pro 息屏后浏览器定时器会被系统降频，到点的语音会迟到。
+       有计时在跑就申请 Screen Wake Lock（要 HTTPS，GitHub Pages 满足）；
+       没计时就释放，别白耗电。息屏再回来会自动重新申请。 */
+    _wl: null,
+    wakeSupported: function () {
+      try { return typeof navigator !== 'undefined' && !!(navigator.wakeLock && navigator.wakeLock.request); }
+      catch (e) { return false; }
+    },
+    /* 现在还有没有「正在跑」的计时（固定任务倒计时 + 故事海 30 分钟） */
+    wakeBusy: function () {
+      try {
+        var s = S.state, now = Date.now(), k;
+        var ts = s.timers || {};
+        for (k in ts) { if (ts[k] && ts[k].end && ts[k].end > now) return true; }
+        var rt = s.readTimer;
+        if (rt && rt.end && rt.end > now) return true;
+      } catch (e) { }
+      return false;
+    },
+    wakeSync: function () {
+      var self = Kid;
+      if (!self.wakeBusy()) { self.wakeRelease(); return false; }
+      if (!self.wakeSupported() || self._wl) return !!self._wl;
+      try {
+        navigator.wakeLock.request('screen').then(function (lock) {
+          self._wl = lock;
+          try {
+            if (lock.addEventListener) lock.addEventListener('release', function () { self._wl = null; });
+          } catch (e) { }
+        })['catch'](function () { self._wl = null; });
+      } catch (e) { }
+      return false;
+    },
+    wakeRelease: function () {
+      try { if (Kid._wl && Kid._wl.release) Kid._wl.release(); } catch (e) { }
+      Kid._wl = null;
+    },
     /* 计时条：没开始 → 开始按钮；计时中 → 大号倒计时 */
     timerHtml: function (taskId, limit) {
       var t = Kid.timerOf(taskId);
@@ -1862,6 +1904,8 @@
       }
       /* 兜底：即便有别的路径触发重绘，也绝不允许每秒都重画一整页 */
       if (Kid._ended && Object.keys(Kid._ended).length > 40) Kid._ended = {};
+      /* 屏幕常亮：有计时在跑就申请，全跑完就释放（每秒同步一次，开销极小） */
+      try { Kid.wakeSync(); } catch (e) { }
     },
     /* 大号倒计时（固定任务卡片里显示） */
     bigTimer: function (taskId) {
@@ -3876,8 +3920,9 @@
         }
         Kid.timerStart(tid, tmin);
         if (global.Sound) global.Sound.unlock();   // 借「开始计时」手势解锁音频
+        Kid.wakeSync();                            // 倒计时期间屏幕保持亮着
         App.render();
-        U.toast('开始计时：' + tmin + ' 分钟');
+        U.toast('开始计时：' + tmin + ' 分钟' + (Kid.wakeSupported() ? '，屏幕会保持亮着 🔆' : ''));
         return false;
       }
       if (name === 'readPick') {
@@ -3892,6 +3937,7 @@
         if (!bk) { U.toast('先写上今天读的是哪本书'); return false; }
         Kid.readStartReading(bk);
         Kid.readPick = bk;
+        Kid.wakeSync();                            // 阅读 30 分钟期间也保持亮屏
         U.toast('开始读《' + bk + '》，30 分钟后才能打卡');
         return true;
       }
