@@ -582,6 +582,114 @@
        设计原则：不给分、不扣分、不做成任务。断一天也只是「停住」。
        ========================================================= */
 
+    /* ---------- 0. 今日讲述：引导式扩写（草稿 + 防刷分 + 素材库） ---------- */
+    SPEECH_DAILY_MAX: 2,        /* 每天最多提交 2 次，第 2 次水滴减半 */
+
+    speechDraftOf: function (date) {
+      var s = st();
+      var d = date || today();
+      if (!s.speechDraft || s.speechDraft.date !== d) return null;
+      return s.speechDraft;
+    },
+    speechDraftStart: function (origin, date) {
+      var s = st();
+      var d = date || today();
+      s.speechDraft = { date: d, origin: String(origin || '').trim(), text: String(origin || '').trim(), asked: [] };
+      S.save();
+      return s.speechDraft;
+    },
+    /* 孩子补了一句：追加到文本，并记下这个维度问过了 */
+    speechDraftAppend: function (ans, key) {
+      var s = st();
+      var d = s.speechDraft;
+      if (!d) return null;
+      var a = String(ans || '').trim();
+      if (!a) return d;
+      if (d.text && d.text.slice(-1) !== '。' && d.text.slice(-1) !== '！' && d.text.slice(-1) !== '？') d.text += '。';
+      d.text += a;
+      if (key && d.asked.indexOf(key) < 0) d.asked.push(key);
+      S.save();
+      return d;
+    },
+    speechDraftSkip: function (key) {
+      var s = st();
+      if (s.speechDraft) {
+        if (key && s.speechDraft.asked.indexOf(key) < 0) s.speechDraft.asked.push(key);
+        S.save();
+      }
+      return s.speechDraft;
+    },
+    speechDraftClear: function () { st().speechDraft = null; S.save(); },
+
+    /* 今天已经提交几次（防刷分） */
+    speechCountToday: function (date) {
+      var d = date || today();
+      return (st().speech || []).filter(function (x) { return x.date === d; }).length;
+    },
+    speechCanSubmit: function (date) {
+      return Engine.speechCountToday(date) < Engine.SPEECH_DAILY_MAX;
+    },
+
+    /* 提交结算：水滴只在提交后发，按分数算，且当天第 2 次减半 */
+    finishSpeech2: function (text, origin, scoreResult, date) {
+      var s = st();
+      var d = date || today();
+      var score = scoreResult.score;
+      var times = Engine.speechCountToday(d) + 1;      /* 这是今天的第几次 */
+
+      var rw = score >= 90 ? { water: 5, sun: 2 }
+        : score >= 80 ? { water: 4, sun: 1 }
+          : score >= 70 ? { water: 3, sun: 0 }
+            : score >= 60 ? { water: 2, sun: 0 }
+              : { water: 1, sun: 0 };
+
+      var water = rw.water;
+      if (times > 1) water = Math.max(1, Math.floor(water / 2));   /* 第二次减半 */
+      var sun = times > 1 ? 0 : rw.sun;
+
+      s.water = (s.water || 0) + water;
+      s.sun = (s.sun || 0) + sun;
+
+      var rec = {
+        id: S.uid(), date: d,
+        text: text, origin: origin || '',
+        score: score, detail: scoreResult.dims || scoreResult.detail,
+        tips: scoreResult.tips, comments: scoreResult.comments,
+        good: scoreResult.good || [],
+        times: times, water: water, sun: sun
+      };
+      if (!s.speech) s.speech = [];
+      s.speech.push(rec);
+      if (water) S.addLedger(water, 'water', '🎤 讲述练习：' + score + ' 分', d);
+      if (sun) S.addLedger(sun, 'sun', '🎤 讲述练习优秀', d);
+      s.speechDraft = null;
+      S.save();
+      return { rec: rec, water: water, sun: sun, times: times };
+    },
+
+    /* ✨ 我的素材库 / 好词好句本 */
+    phraseAdd: function (text, why) {
+      var s = st();
+      if (!Array.isArray(s.phraseBook)) s.phraseBook = [];
+      text = String(text || '').trim();
+      if (!text) return null;
+      if (s.phraseBook.some(function (x) { return x.text === text; })) return null;  /* 去重 */
+      var p = { id: S.uid(), text: text, why: why || '', date: today(), at: Date.now() };
+      s.phraseBook.push(p);
+      S.save();
+      return p;
+    },
+    phraseList: function () {
+      var s = st();
+      if (!Array.isArray(s.phraseBook)) s.phraseBook = [];
+      return s.phraseBook.slice().sort(function (a, b) { return b.at - a.at; });
+    },
+    phraseDel: function (id) {
+      var s = st();
+      s.phraseBook = (s.phraseBook || []).filter(function (x) { return x.id !== id; });
+      S.save();
+    },
+
     /* ---------- 1. 心情天气 ---------- */
     MOODS: [
       { k: 'sun', e: '☀️', t: '晴', c: '#F2A93B' },
