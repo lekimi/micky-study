@@ -223,6 +223,40 @@
     return { text: pool[h % pool.length], mode: 'local' };
   }
 
+  /* ---------------- 本地「升格改写」----------------
+     用孩子自己写的内容，补上他缺的要素，做出一个更高分的示范版本。
+     原则：事情、人物、经过全是他自己的，只改表达、不替他编内容。 */
+  function localPolish(text) {
+    var t = String(text || '').replace(/\s+/g, '').trim();
+    if (!t) return { rewrite: '', changes: [], mode: 'local' };
+    var changes = [];
+    var sents = t.match(/[^。！？]+[。！？]?/g) || [t];
+
+    /* 1) 时间 / 地点 */
+    if (!has(t, TIME_WORDS) && !has(t, PLACE_WORDS)) {
+      sents[0] = '今天，' + sents[0];
+      changes.push('开头补了「今天」——读者马上知道是什么时候的事（补上「时间」要素）');
+    }
+    /* 2) 先后顺序 */
+    if (countHits(sents.join(''), SEQ_WORDS).n < 1 && sents.length > 1) {
+      sents[1] = '然后，' + sents[1];
+      changes.push('第二句前加了「然后」——事情的先后就清楚了（补上「顺序」要素）');
+    }
+    var out = sents.join('');
+    /* 3) 心情感受 */
+    if (countHits(out, FEEL_WORDS).n < 1) {
+      out = out.replace(/[。！？]?$/, '') + '。我心里觉得暖暖的，一直到回家都还记得。';
+      changes.push('结尾加了一句心里感受——文章有了温度（补上「感受」要素）');
+    }
+    /* 4) 把平淡的词换成更生动的说法 */
+    out = out.replace(/很高兴/g, '心里乐开了花')
+      .replace(/很开心/g, '心里乐开了花')
+      .replace(/很快地?跑/g, '飞快地跑')
+      .replace(/很好看/g, '漂亮极了');
+
+    return { rewrite: out, changes: changes, mode: 'local' };
+  }
+
   var AI = {
     /* 自动悄悄话：返回 Promise<{text, mode}> —— 连不上 / 没配 Key 都自动退回本地 */
     autoNote: function (moodKey, kidName, cfg, seedStr) {
@@ -235,6 +269,39 @@
       return Promise.resolve(localNote(moodKey, seedStr));
     },
     localNote: localNote,
+    localPolish: localPolish,
+
+    /* ---------- 升格改写：按孩子自己的短文，给一个更高分的示范 ---------- */
+    polish: function (text, cfg) {
+      cfg = cfg || {};
+      if (!(cfg.enabled && cfg.apiKey)) return Promise.resolve(localPolish(text));
+      var SYS = '你是小学语文老师，正在帮二年级男孩 Micky 修改他自己的一段小短文。\n' +
+        '铁律：事情、人物、经过必须完全是他原文里的内容，**不许编造新情节**，只改表达方式。\n' +
+        '改法：补上缺的时间/地点、用上「先…然后…最后」这类顺序词、加一两句好词好句、' +
+        '结尾补一句真实的心理感受。改完要比原文更通顺更生动，但仍然像二年级孩子写的话（不要写成大人腔）。\n' +
+        '严格输出 JSON：{"rewrite":"改后的完整短文","changes":["改动1（说明为什么这样改更好）","改动2"]}，不要多余文字。';
+      var base = (cfg.baseUrl || 'https://api.deepseek.com/v1').replace(/\/+$/, '');
+      return fetch(base + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+        body: JSON.stringify({
+          model: cfg.model || 'deepseek-chat',
+          messages: [
+            { role: 'system', content: SYS },
+            { role: 'user', content: '这是他自己写的：\n' + text + '\n\n请改成更高分的版本。' }
+          ],
+          temperature: 0.7
+        })
+      }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (j) {
+          var raw = (j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+          var m = raw.match(/\{[\s\S]*\}/);
+          if (!m) throw new Error('返回格式异常');
+          var o = JSON.parse(m[0]);
+          if (!o.rewrite) throw new Error('没有改写结果');
+          return { rewrite: String(o.rewrite), changes: Array.isArray(o.changes) ? o.changes : [], mode: 'llm' };
+        })['catch'](function () { return localPolish(text); });
+    },
 
     /* ---------- 妈妈端「今日表扬」AI 润色 ---------- */
     praise: function (dayData, cfg) {
