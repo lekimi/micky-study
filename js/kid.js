@@ -501,6 +501,46 @@
           '</div>';
       }
 
+      /* 📊 有理有据：把每个维度给了多少分、因为哪个词给的分，摊开给妈妈和孩子看 */
+      var rubric = '';
+      if ((done.detail || []).length) {
+        rubric = '<div style="margin-top:10px">' +
+          '<div class="sec-title" style="font-size:14px">📊 分数是怎么来的（一项一项算的）</div>' +
+          (done.detail || []).map(function (d) {
+            var g = null;
+            if (sc && sc.GUIDE) sc.GUIDE.forEach(function (x) { if (x.key === d.key) g = x; });
+            var mx = g ? g.max : null;
+            return '<div class="row" style="padding:6px 0;border-bottom:1px dashed #E6DCC0">' +
+              '<div class="row-main"><div class="row-t" style="font-size:14px">' + (d.icon || '') + ' ' + U.esc(d.label) + '</div>' +
+              '<div class="row-s">' + (d.hit ? ('写到了「' + U.esc(d.word || '') + '」') : '这一项还没写到') + '</div></div>' +
+              '<span class="pill-btn ' + (d.hit ? 'pill-ok' : 'pill-gray') + '" style="pointer-events:none">' +
+              (d.pts || 0) + (mx ? ' / ' + mx : '') + ' 分</span>' +
+              '</div>';
+          }).join('') + '</div>';
+      }
+
+      /* ✨ 升格改写：用他自己写的短文，做一个更高分的示范 */
+      var polishHtml = '';
+      if (done.rewriteOpen && done.rewrite) {
+        polishHtml = '<div style="background:#F3F0FF;border:2px solid #D9C7F2;border-radius:14px;padding:12px;margin-top:10px">' +
+          '<div class="sec-title" style="font-size:14px">✨ 老师改写的更高分版本</div>' +
+          '<div class="muted" style="font-size:12px;margin-bottom:6px">事情、人物、经过都是你自己写的，老师只改了表达。' +
+          (done.rewriteMode === 'llm' ? '' : '（本地示范版）') + '</div>' +
+          '<div style="background:#fff;border-radius:12px;padding:10px;line-height:1.9;font-weight:700;color:#4A3A6B">' +
+          U.esc(done.rewrite) + '</div>' +
+          ((done.rewriteChanges || []).length
+            ? '<div style="margin-top:8px">' + (done.rewriteChanges || []).map(function (c) {
+              return '<div style="font-size:13px;color:#5A4A78;line-height:1.7;margin-bottom:4px">👉 ' + U.esc(c) + '</div>';
+            }).join('') + '</div>'
+            : '') +
+          '<button class="btn btn-ghost mt8" data-act="phAdd" data-v="' + U.esc(done.rewrite) + '" style="font-size:13px">⭐ 存进我的素材库</button>' +
+          '</div>';
+      }
+      var polishBtn = (done.score >= 0)
+        ? '<button class="btn btn-lav mt8" data-act="speechPolish" style="font-size:14px">' +
+        (done.rewrite ? (done.rewriteOpen ? '收起老师的改写' : '✨ 看看老师怎么改写得更好') : '✨ 正在改写…') + '</button>'
+        : '';
+
       return '<div class="card card-cream mt12">' +
         '<div class="sec-title">🎤 今日讲述 · 已完成' + ((done.times || 1) > 1 ? '（第 ' + done.times + ' 次）' : '') + '</div>' +
         '<div style="text-align:center;padding:4px 0 10px">' +
@@ -508,6 +548,7 @@
         '<div class="muted" style="font-weight:800">' + U.esc(global.AI.rewardText(done)) + '</div>' +
         '</div>' +
         '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">' + dims + '</div>' +
+        rubric +
         (done.comments || []).map(function (c) {
           return '<div style="background:#FFF3CC;border-radius:12px;padding:8px 10px;margin-bottom:6px;font-size:14px;color:#7A5B33">💛 ' + U.esc(c) + '</div>';
         }).join('') +
@@ -515,6 +556,7 @@
           return '<div style="background:#EAF3D8;border-radius:12px;padding:8px 10px;margin-bottom:6px;font-size:14px;color:#4B6B1E">🌱 ' + U.esc(c) + '</div>';
         }).join('') +
         cmp +
+        polishHtml + polishBtn +
         '<button class="btn btn-ghost mt8" data-act="respeech">再讲一次</button>' +
         '</div>';
     },
@@ -558,11 +600,13 @@
             }).join('') +
             '</div></div>'
             : '') +
+          Kid.phraseBar(cur.key) +
           '<textarea class="field mt8" id="sp-ans" rows="3" placeholder="把你想到的话写在这里…" style="min-height:96px;line-height:1.8"></textarea>' +
           '<div style="display:flex;gap:8px;margin-top:8px">' +
           '<button class="btn btn-green" style="flex:1;min-height:52px" data-act="spAnswer">说好了，加上去</button>' +
           '<button class="btn btn-ghost" style="width:auto;min-height:52px;padding:10px 16px;font-size:14px" data-act="spSkip">这个我没有</button>' +
-          '</div>';
+          '</div>' +
+          Kid.micBar();
       } else if (miss.length) {
         askHtml = '<button class="btn btn-lav mt8" data-act="spAsk">🤔 让老师再问我一句</button>';
       }
@@ -588,6 +632,12 @@
     speechPanel: function (date) {
       var done = E.speechToday(date);
       var d = E.speechDraftOf(date);
+
+      /* 看图写话已合并进来：正在写图 / 点了「给我一幅图」时，交给 picwrite.js 渲染 */
+      if (global.PicWrite) {
+        if (d && d.mode === 'pic') return global.PicWrite.panel();
+        if (Kid.picOpen) return global.PicWrite.panel();
+      }
 
       /* 今天提交次数用完 → 只展示成绩 */
       if (done && !d && !E.speechCanSubmit(date)) {
@@ -615,13 +665,62 @@
         '</div>';
     },
 
+    /* 🎤 语音输入条：麦克风 + 状态 + 「整理一下」（孩子说话容易打绊、重复） */
+    micBar: function () {
+      var sup = global.Asr && global.Asr.supported();
+      return '<div style="display:flex;gap:8px;align-items:center;margin-top:8px">' +
+        '<button class="btn ' + (Kid.micOn ? 'btn-green' : 'btn-lav') + '" style="width:auto;min-height:52px;font-size:14px;padding:8px 14px" data-act="spMic">' +
+        (Kid.micOn ? '⏹ 我说完啦（停止）' : '🎤 用说的') + '</button>' +
+        '<div id="mic-status" class="muted" style="flex:1;font-size:12px;line-height:1.5">' +
+        (Kid.micOn
+          ? '正在听…慢慢说，说完再点一下停下'
+          : (sup ? '先在心里想好再说，说完它会变成字' : '这个浏览器不支持语音输入，用键盘写一样棒')) +
+        '</div></div>' +
+        '<button class="btn btn-ghost mt8" data-act="speechTidy" style="font-size:13px">🧹 整理一下（去掉重复的话）</button>';
+    },
+
+    /* ✨ 好词好句：按当前问的维度给半成品句式，点一下加进输入框，孩子再改成自己的话 */
+    phraseBar: function (key) {
+      var sc = global.SpeechCoach;
+      if (!sc || !sc.phrasesFor) return '';
+      var list = sc.phrasesFor(key);
+      if (!list || !list.length) return '';
+      return '<div style="margin-top:8px">' +
+        '<div style="font-size:12px;font-weight:900;color:#7A6248;margin-bottom:6px">' +
+        '✨ 好词好句，点一个加进去（再把它说成你自己的话）：</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+        list.map(function (p) {
+          return '<button class="pill-btn" style="min-height:52px;font-size:12px;padding:8px 10px" ' +
+            'data-act="spPhrase" data-v="' + U.esc(p) + '">' + U.esc(p) + '</button>';
+        }).join('') + '</div></div>';
+    },
+
     /* 开头输入框（两处复用） */
     speechStartHtml: function () {
       return '<textarea class="field mt8" id="speech-text" rows="3" ' +
         'placeholder="今天最让我难忘的是……（一句话就行）" style="min-height:96px;line-height:1.8"></textarea>' +
+        Kid.micBar() +
         '<div class="muted mt8" style="font-size:12px">不会写的字可以用拼音。</div>' +
         '<button class="btn btn-green mt8" data-act="speechStart">开始，让老师问我</button>' +
-        '<button class="btn btn-ghost mt8" data-act="speechDirect" style="font-size:14px">今天不想被问，我自己写完</button>';
+        '<button class="btn btn-ghost mt8" data-act="speechDirect" style="font-size:14px">今天不想被问，我自己写完</button>' +
+        '<button class="btn btn-ghost mt8" data-act="picOpen" style="font-size:14px">🖼️ 今天没什么可说的，给我一幅图（看图写话）</button>' +
+        Kid.topicBar();
+    },
+
+    /* 🤔 写日记的「找话题」方向：练的是「善于发现身边的事」 */
+    TOPICS: [
+      '今天在学校，', '放学路上，', '今天我发现，', '今天最让我开心的是',
+      '今天有点难过的是', '我和同学', '妈妈（爸爸）今天', '我今天学会了一件'
+    ],
+    topicBar: function () {
+      return '<div style="margin-top:10px">' +
+        '<div style="font-size:12px;font-weight:900;color:#7A6248;margin-bottom:6px">' +
+        '🤔 不知道写什么？从这几个方向找找看（每天发现一件小事，就是日记）：</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+        Kid.TOPICS.map(function (p) {
+          return '<button class="pill-btn" style="min-height:52px;font-size:12px;padding:8px 10px" ' +
+            'data-act="spPhrase" data-v="' + U.esc(p) + '">' + U.esc(p) + '</button>';
+        }).join('') + '</div></div>';
     },
 
     /* ✨ 我的素材库 */
@@ -1710,11 +1809,17 @@
         if (left === 0) {
           el.textContent = '⏰ 时间到啦';
           el.style.color = '#C0392B'; el.style.background = '#FDECEA'; el.style.borderColor = '#E8A9A9';
-          /* 时间走完 → 重绘一次，把「时间到啦，打卡」按钮换上来（只换一次，不会循环） */
-          if (el.getAttribute('data-ended') !== '1') {
-            el.setAttribute('data-ended', '1');
+          /* 时间走完 → 重绘一次，把「时间到啦，打卡」按钮换上来。
+             ⚠️ 必须记在模块级 map 里（按倒计时唯一 key），不能只记在 DOM 属性上：
+             重绘会把元素整个换成新的，属性跟着丢 → 下一秒又判定"刚结束"→ 无限每秒重绘
+             （表现为"时间到了"按钮不停闪、讲述输入框被反复重建没法打字）。 */
+          var endKey = (el.getAttribute('data-task') || el.getAttribute('data-timer') || 'x') + ':' + end;
+          Kid._ended = Kid._ended || {};
+          if (!Kid._ended[endKey]) {
+            Kid._ended[endKey] = 1;
             needRender = true;
           }
+          el.setAttribute('data-ended', '1');
         } else {
           el.textContent = '⏱ ' + m + ':' + (sec < 10 ? '0' : '') + sec;
           if (left <= 60) { el.style.color = '#C0392B'; el.style.background = '#FDECEA'; }
@@ -1723,6 +1828,8 @@
       if (needRender && global.App && global.App.render) {
         setTimeout(function () { try { global.App.render(); } catch (e) { } }, 60);
       }
+      /* 兜底：即便有别的路径触发重绘，也绝不允许每秒都重画一整页 */
+      if (Kid._ended && Object.keys(Kid._ended).length > 40) Kid._ended = {};
     },
     /* 大号倒计时（固定任务卡片里显示） */
     bigTimer: function (taskId) {
@@ -2733,9 +2840,8 @@
         '<div class="sec-title" style="font-size:16px">✅ 今日任务</div>' + todayHtml + '</div>';
 
       if (subj === 'chinese') {
-        if (global.PicWrite) {
-          html += '<div style="padding:12px 14px 0">' + global.PicWrite.panel() + '</div>';
-        }
+        /* ⚠️ 看图写话已合并进「今日讲述」：不再单独占一块，
+           speechPanel 内部会在孩子点「给我一幅图」或正在写图时，调用 PicWrite.panel()。 */
         html += '<div style="padding:12px 14px 0">' + Kid.speechPanel(date) + '</div>';
         html += '<div style="padding:12px 14px 0">' + Kid.phrasePanel() + '</div>';
         html += '<div style="padding:12px 14px 0">' + Kid.cnPanel() + '</div>';
@@ -3275,6 +3381,69 @@
         return false;
       }
 
+      /* 🎤 语音输入：只把「最终结果」追加进输入框，临时结果显示在状态条上（避免重复叠加） */
+      if (name === 'spMic') {
+        if (!global.Asr || !global.Asr.supported()) {
+          U.toast('这个浏览器不支持语音输入，用键盘写也一样棒～');
+          return false;
+        }
+        function micTarget() {
+          var el = document.getElementById('sp-ans');
+          if (el) return el;
+          return document.getElementById('speech-text');
+        }
+        if (Kid.micOn) {
+          global.Asr.stop();
+          Kid.micOn = 0;
+          App.render();
+          return false;
+        }
+        Kid.micOn = 1;
+        global.Asr.start(
+          function (interim) {                     // 临时结果：只更新状态条，不写进框里
+            var st = document.getElementById('mic-status');
+            if (st) st.textContent = '正在听：' + interim;
+          },
+          function (finalTxt) {                    // 最终结果：追加进输入框
+            var el2 = micTarget();
+            if (el2) el2.value = (el2.value || '') + finalTxt;
+            var st2 = document.getElementById('mic-status');
+            if (st2) st2.textContent = '听到了，已经放进去啦～继续说或点停止。';
+          },
+          function (err) {
+            Kid.micOn = 0;
+            try { App.render(); } catch (e3) { }
+            U.toast(err === 'not-allowed' ? '要允许用麦克风哦' : '没听清，再试一次');
+          }
+        );
+        App.render();
+        return false;
+      }
+
+      /* 🧹 整理一下：去掉口癖和重复（孩子说话容易打绊、来回重复） */
+      if (name === 'speechTidy') {
+        var sc2 = global.SpeechCoach;
+        if (!sc2 || !sc2.tidyText) return false;
+        var ea = document.getElementById('sp-ans') || document.getElementById('speech-text');
+        if (!ea) return false;
+        var before = String(ea.value || '');
+        var after = sc2.tidyText(before);
+        if (after === before) { U.toast('很通顺，没有要改的～'); return false; }
+        ea.value = after;
+        U.toast('整理好啦，重复的话去掉了');
+        return false;
+      }
+
+      /* ✨ 点好词好句 → 追加进输入框让孩子自己改成自己的话 */
+      if (name === 'spPhrase') {
+        var ep = document.getElementById('sp-ans') || document.getElementById('speech-text');
+        if (ep) {
+          ep.value = (ep.value || '') + String(v || '');
+          try { ep.focus(); } catch (e4) { }
+        }
+        return false;
+      }
+
       if (name === 'spSkip') {
         if (Kid.spAsk) E.speechDraftSkip(Kid.spAsk.key);
         Kid.spAsk = null;
@@ -3308,6 +3477,25 @@
           '提交之后就打分给水滴了，不能再改。\n（现在一共 ' + n0 + ' 个字）',
           function () { Kid.act('speechSubmit'); }, '是的，讲完啦');
         return false;
+      }
+
+      /* ✨ 升格改写：用他自己写的短文，做一个更高分的示范（不替他编内容） */
+      if (name === 'speechPolish') {
+        var last = (S.state.speech || []).filter(function (x) { return x.date === date; }).slice(-1)[0];
+        if (!last) return false;
+        if (!last.rewrite) {
+          global.AI.polish(last.text, s.ai).then(function (r) {
+            last.rewrite = r.rewrite || '';
+            last.rewriteChanges = r.changes || [];
+            last.rewriteMode = r.mode || 'local';
+            S.save();
+            try { global.App.render(); } catch (e5) { }
+          });
+          return false;                 // 加载中，按钮显示「正在改…」
+        }
+        last.rewriteOpen = !last.rewriteOpen;
+        S.save();
+        return true;
       }
 
       if (name === 'speechSubmit') {
@@ -3372,6 +3560,13 @@
       }
 
       if (name === 'phDel') { E.phraseDel(v); return true; }
+      /* 把改写后的好句子存进素材库 */
+      if (name === 'phAdd') {
+        if (!v) return false;
+        E.phraseAdd(String(v).slice(0, 120), '老师改写版');
+        U.toast('存进素材库啦 ✨');
+        return true;
+      }
 
       /* 听力顺序播放器：切换课次（到头就停在原地，不绕圈，免得孩子迷路） */
       if (name === 'listenGo') {
@@ -3570,7 +3765,12 @@
       if (name === 'timerStart') {
         var tp = String(v).split(':');
         var tid = tp[0], tmin = parseInt(tp[1], 10) || 10;
-        if (t.kind === 'fixed' && !Kid.fixedUnlocked(tid, S.dateStr())) {
+        /* ⚠️ 这里曾经写成 `t.kind` —— 但 act() 里根本没有 t 这个变量，
+           直接 ReferenceError：点「开始计时」会静默失败、计时根本没启动。
+           必须自己按 id 把任务找出来。 */
+        var tsk = null;
+        (S.state.tasks || []).forEach(function (x) { if (x.id === tid) tsk = x; });
+        if (tsk && tsk.kind === 'fixed' && !Kid.fixedUnlocked(tid, S.dateStr())) {
           U.toast('先把上一项做完并通过，才能开始这项哦 🔒');
           return false;
         }
