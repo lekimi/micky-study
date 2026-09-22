@@ -1,0 +1,257 @@
+{
+ "version": 1,
+ "kidName": "Micky",
+ "pin": "1234",
+ "autoApprove": false,
+ "sun": 20,
+ "water": 0,
+ "zombieStep": 0,
+ "sunflowerUnlocked": false,
+ "lastSunflowerDate": null,
+ "lastSettleDate": null,
+ "garden": [
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  },
+  {
+   "plant": null,
+   "at": null
+  }
+ ],
+ "tasks": [
+  {
+   "kind": "fixed",
+   "slot": "weekday",
+   "timer": 1,
+   "id": "f2",
+   "title": "练字（10 分钟）",
+   "emoji": "🖌️",
+   "subject": "chinese",
+   "order": 0,
+   "limit": 10
+  },
+  {
+   "kind": "fixed",
+   "slot": "weekday",
+   "timer": 1,
+   "id": "f3",
+   "title": "计算小超市（5 分钟）",
+   "emoji": "🛒",
+   "subject": "math",
+   "order": 1,
+   "limit": 5,
+   "early": 1
+  },
+  {
+   "kind": "fixed",
+   "slot": "weekday",
+   "timer": 1,
+   "id": "f4",
+   "title": "四面八方 App 打卡（20 分钟）",
+   "emoji": "📱",
+   "subject": "english",
+   "order": 2,
+   "limit": 20
+  },
+  {
+   "kind": "fixed",
+   "slot": "weekend",
+   "timer": 1,
+   "id": "w1",
+   "title": "练字（10 分钟）",
+   "emoji": "🖌️",
+   "subject": "chinese",
+   "order": 0,
+   "limit": 10
+  },
+  {
+   "kind": "fixed",
+   "slot": "weekend",
+   "timer": 1,
+   "id": "w2",
+   "title": "计算小超市（5 分钟）",
+   "emoji": "🛒",
+   "subject": "math",
+   "order": 1,
+   "limit": 5,
+   "early": 1
+  },
+  {
+   "kind": "fixed",
+   "slot": "weekend",
+   "timer": 1,
+   "id": "w3",
+   "title": "四面八方 App 打卡（20 分钟）",
+   "emoji": "📱",
+   "subject": "english",
+   "order": 2,
+   "limit": 20
+  },
+  {
+   "id": "e_cn_speech",
+   "title": "说说今天最难忘的一件事",
+   "emoji": "🎤",
+   "kind": "extra",
+   "subject": "chinese",
+   "mode": "speech"
+  },
+  {
+   "id": "e_read",
+   "title": "故事海漂流 · 阅读看书",
+   "emoji": "🌊",
+   "kind": "extra",
+   "subject": "chinese",
+   "water": 10,
+   "optional": 1
+  },
+  {
+   "id": "e_ot_1",
+   "title": "帮家里做一件家务",
+   "emoji": "🧹",
+   "kind": "extra",
+   "subject": "other"
+  }
+ ],
+ "days": {},
+ "dictRound": 0,
+ "weekPenalty": {},
+ "speech": [],
+ "quiz": [],
+ "pv": {},
+ "readLog": [],
+ "timers": {},
+ "math": {
+  "stars": {},
+  "cleared": {},
+  "hintDay": "",
+  "hintLeft": 5,
+  "streak": 0,
+  "bestStreak": 0,
+  "sunStep": 0,
+  "got6": 0,
+  "got9": 0,
+  "sudFree": 0
+ },
+ "mathConf": {
+  "enable": 1,
+  "baseMin": 10,
+  "maxMin": 20,
+  "currency": "water",
+  "redeemDay": null,
+  "redeemMin": 0,
+  "bonus": {}
+ },
+ "mathUse": {},
+ "myTasks": [],
+ "flowers": 0,
+ "hwLog": [],
+ "ai": {
+  "enabled": false,
+  "provider": "",
+  "apiKey": "",
+  "model": "",
+  "baseUrl": ""
+ },
+ "submissions": [],
+ "shop": [
+  {
+   "id": "sh1",
+   "name": "看动画片 15 分钟",
+   "emoji": "📺",
+   "price": 30,
+   "desc": "自己选一集"
+  },
+  {
+   "id": "sh2",
+   "name": "决定今晚吃什么",
+   "emoji": "🍜",
+   "price": 25,
+   "desc": "全家听你的"
+  },
+  {
+   "id": "sh3",
+   "name": "和爸爸打一场球",
+   "emoji": "🏀",
+   "price": 40,
+   "desc": "爸爸不许放水"
+  },
+  {
+   "id": "sh4",
+   "name": "周末去公园",
+   "emoji": "🌳",
+   "price": 60,
+   "desc": "挑一个想去的地方"
+  },
+  {
+   "id": "sh5",
+   "name": "一盒小乐高",
+   "emoji": "🧱",
+   "price": 150,
+   "desc": "自己挑一盒"
+  },
+  {
+   "id": "sh6",
+   "name": "晚睡 20 分钟",
+   "emoji": "🌙",
+   "price": 35,
+   "desc": "仅限周五周六"
+  }
+ ],
+ "redeems": [],
+ "ledger": [],
+ "zombieLog": [],
+ "createdAt": "2026-09-22"
+}
