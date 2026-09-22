@@ -256,6 +256,14 @@
     try { App.appTick(); } catch (e) { }
   }, 1000);
 
+  /* 息屏/切后台再回来：屏幕常亮会被系统收回，这里自动重新申请 */
+  try {
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) return;
+      try { if (global.Kid && Kid.wakeSync) Kid.wakeSync(); } catch (e) { }
+    });
+  } catch (e) { }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', App.boot);
   } else {
