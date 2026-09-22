@@ -640,7 +640,7 @@
         body = '<audio controls style="width:100%;margin:8px 0" src="' + item.audio + '"></audio>' +
           '<div class="muted">先听一遍，再回答下面的问题。可以点重听。</div>';
       } else {
-        body = '<div style="background:#FFF8E4;border:2px solid #EFDDB8;border-radius:14px;padding:12px;line-height:1.9;font-size:15px">' +
+        body = '<div style="background:#FFF8E4;border:2px solid #EFDDB8;border-radius:14px;padding:12px;line-height:1.8;font-size:14px">' +
           item.sentences.map(function (s) { return U.esc(s); }).join('<br>') +
           '</div>';
       }
@@ -651,7 +651,7 @@
             '<input type="radio" name="lwte_' + item.id + '_' + q.no + '" value="' + k + '" style="transform:scale(1.4);margin-right:8px">' +
             '<b>' + k + '.</b> ' + U.esc(q.options[k]) + '</label>';
         }).join('');
-        return '<div style="margin-top:12px"><div style="font-weight:900;font-size:15px;color:#5C4322">' + q.no + '. ' + U.esc(q.q) + '</div>' + opts + '</div>';
+        return '<div style="margin-top:12px"><div style="font-weight:900;font-size:14px;color:#5C4322">' + q.no + '. ' + U.esc(q.q) + '</div>' + opts + '</div>';
       }).join('');
 
       return '<div class="card mt12">' +
@@ -690,6 +690,12 @@
           else { o.opts = q.opts; o.ans = q.ans; }
           return o;
         });
+      }
+      /* 精简模式：只出 6 道语法题（4 单选 + 1 多选 + 1 判断），阅读部分走纸质卷子 */
+      var ln3 = Kid.lean();
+      if (ln3.on && ln3.enReviewN) {
+        return pick(tag(R.single, 'single'), 4)
+          .concat(pick(tag(R.multi, 'multi'), 1), pick(tag(R.judge, 'judge'), 1));
       }
       return pick(tag(R.single, 'single'), 5)
         .concat(pick(tag(R.multi, 'multi'), 2), pick(tag(R.judge, 'judge'), 1));
@@ -812,20 +818,90 @@
       return (it.no ? it.no + ' ' : '') + (it.title || '');
     },
 
+    /* ---------------- 听力顺序播放器 ----------------
+       精简模式专用：屏幕上只放音频，按 L1、L2、L3… 顺序播，
+       孩子照着纸质卷子做。不显示题目，也不判分。 */
+    listenPlayer: function () {
+      var L = global.LWTE;
+      var list = (L && L.listenings) ? L.listenings : [];
+      /* 按 L 后面的数字排序，保证 L1 → L2 → L10 → L11（不是按字符串 L1,L10,L2） */
+      var seq = list.slice().sort(function (a, b) {
+        function n(x) { var m = String(x.id || '').match(/(\d+)/); return m ? parseInt(m[1], 10) : 0; }
+        return n(a) - n(b);
+      });
+
+      if (!seq.length) {
+        return '<div class="card mt12"><div class="empty">还没有听力音频（需要运行 build_corpus.py --audio）</div></div>';
+      }
+
+      var cur = Kid.listenIdx || 0;
+      if (cur < 0 || cur >= seq.length) cur = 0;
+      var it = seq[cur];
+      var audio = it.audio || ('media/lwte2a/' + it.id + '.mp3');
+
+      var rows = seq.map(function (x, i) {
+        var on = (i === cur);
+        return '<button class="btn ' + (on ? 'btn-green' : 'btn-ghost') + '" style="width:auto;min-height:52px;padding:8px 12px;font-size:14px" ' +
+          'data-act="listenGo" data-v="' + i + '">' + U.esc(x.id) + '</button>';
+      }).join('');
+
+      return '<div class="card mt12" style="background:#F7FBFF;border:2px solid #C9E0F5">' +
+        '<div class="sec-title">🎧 朗文听力（按 L1、L2… 顺序）</div>' +
+        '<div class="muted" style="font-size:13px;margin-bottom:8px">' +
+        '拿出纸质卷子，点播放就行。听完自己翻页对答案，这里不显示题目也不判分。' +
+        '</div>' +
+        '<div style="background:#fff;border:2px solid #EFDDB8;border-radius:14px;padding:12px">' +
+        '<div style="font-weight:900;font-size:20px;color:#2E7CA8">' + U.esc(it.id) + '</div>' +
+        (it.title ? '<div class="muted" style="font-weight:800;margin-top:2px">' + U.esc(it.title) + '</div>' : '') +
+        '<audio controls preload="metadata" style="width:100%;margin-top:10px" src="' + U.esc(audio) + '">' +
+        '你的浏览器不支持播放</audio>' +
+        '<div class="muted" style="font-size:12px;margin-top:6px">' +
+        '▶ 如果没声音：点一下上面的播放键，确认手机/平板没静音。' +
+        '</div></div>' +
+        '<div style="display:flex;gap:8px;margin-top:10px">' +
+        '<button class="btn btn-ghost" style="flex:1;min-height:52px;font-size:14px" data-act="listenGo" data-v="' + (cur - 1) + '">← 上一课</button>' +
+        '<button class="btn btn-ghost" style="flex:1;min-height:52px;font-size:14px" data-act="listenGo" data-v="' + (cur + 1) + '">下一课 →</button>' +
+        '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">' + rows + '</div>' +
+        '</div>';
+    },
+
+    /* 精简模式配置（老数据自动补默认值） */
+    lean: function () {
+      var s = S.state;
+      if (!s.lean || typeof s.lean !== 'object') {
+        s.lean = { on: 1, noChars: 1, noPreview: 1, noReading: 1, enReviewN: 6, listenSeq: 1 };
+      }
+      return s.lean;
+    },
+
     cnPanel: function () {
       var C = Kid.cnData();
       if (!C) return '';
 
       /* ---- 入口 ---- */
       if (!Kid.cnTab) {
+        var ln = Kid.lean();
+        var btns = '';
+        if (!(ln.on && ln.noPreview)) {
+          btns += '<button class="btn btn-green mb8" data-act="cnTab" data-v="preview">🔍 预习探险（上下册全目录）</button>';
+        }
+        if (!(ln.on && ln.noChars)) {
+          btns += '<button class="btn btn-green mb8" data-act="cnTab" data-v="chars">🔤 生字闯关（10 题）</button>';
+        }
+        btns += '<button class="btn btn-green mb8" data-act="cnTab" data-v="recite">🎮 背诵闯关</button>';
+        btns += '<button class="btn btn-green mb8" data-act="cnTab" data-v="read">🌊 故事海漂流（阅读打卡）</button>';
+        btns += '<button class="btn btn-green" data-act="cnTab" data-v="dict">🎧 听写练习</button>';
+
+        var tip = (ln.on && (ln.noChars || ln.noPreview))
+          ? '<div class="muted" style="font-size:12px;margin-bottom:8px">' +
+          '精简模式：字词类的预习和练习关掉了，这些在纸质书上做更好。妈妈端可以打开。</div>'
+          : '';
+
         return '<div class="card mt12">' +
           '<div class="sec-title">📚 语文学习园（' + C.meta.version + '）</div>' +
           '<div class="muted" style="margin-bottom:10px">跟着课本走，学到哪一课就点哪一课。</div>' +
-          '<button class="btn btn-green mb8" data-act="cnTab" data-v="preview">🔍 预习探险（上下册全目录）</button>' +
-          '<button class="btn btn-green mb8" data-act="cnTab" data-v="chars">🔤 生字闯关（10 题）</button>' +
-          '<button class="btn btn-green mb8" data-act="cnTab" data-v="recite">🎮 背诵闯关</button>' +
-          '<button class="btn btn-green mb8" data-act="cnTab" data-v="read">🌊 故事海漂流（阅读打卡）</button>' +
-          '<button class="btn btn-green" data-act="cnTab" data-v="dict">🎧 听写练习</button>' +
+          tip + btns +
           '</div>';
       }
 
@@ -1248,6 +1324,22 @@
 
     cnPreview: function () {
       if (Kid.pvLesson === -2) return Kid.pvCatalog();
+      /* 第 5 关 · 背诵挑战：rcOpen 设了 rcId 但以前没人在预习页渲染它，
+         点了就又退回关卡列表，看起来像「点不进去」。现在在这里接上。 */
+      if (Kid.rcId) {
+        /* 支持两种：预习第5关传「课号|课题」，背诵页传真实 id */
+        var rit = Kid.reciteById(Kid.rcId);
+        if (!rit && Kid.rcId.indexOf('|') > 0) {
+          var pp = Kid.rcId.split('|');
+          rit = Kid.reciteByLesson(pp[0], pp[1]);
+        }
+        if (rit) {
+          return '<div class="card mt12">' +
+            '<button class="btn btn-ghost" style="min-height:52px;font-size:14px;margin-bottom:10px" data-act="rcBack">← 回关卡</button>' +
+            Kid.cnRecite(rit) + '</div>';
+        }
+        Kid.rcId = '';   /* 找不到这篇就退回关卡列表，别卡住 */
+      }
       if (Kid.pvStage === 'read') return Kid.pvRead();
       if (Kid.pvStage === 'ask') return Kid.pvAsk();
       if (Kid.pvStage === 'boss') return Kid.pvBoss();
@@ -1342,7 +1434,7 @@
         card('🧟', '第 3 关 · 僵尸闯关', quizN + ' 道课后题，答错有提示', 'pvStage', 'boss', !!p.boss) +
         card('🧩', '第 4 关 · 故事拼图', '把课文讲的事按顺序排好', 'pvStage', 'sum', !!p.sum) +
         (d.recite
-          ? card('🎤', '第 5 关 · 背诵挑战', '思维导图 + 五种玩法', 'rcOpen', U.esc(d.no + d.title), !!p.done)
+          ? card('🎤', '第 5 关 · 背诵挑战', '思维导图 + 五种玩法', 'rcOpen', U.esc(d.no + '|' + d.title), !!p.done)
           : '') +
         '<button class="btn btn-lav mt12" data-act="pvFinish" data-v="' + U.esc(key) + '">' +
         (p.done ? '✅ 这一课已经预习完啦' : '🎉 我预习完这一课了') + '</button>';
@@ -1419,7 +1511,7 @@
       }).join('<br>');
 
       var textHtml = lines.length
-        ? '<div style="background:#FFFDF4;border:2px solid #E8D3A8;border-radius:14px;padding:14px;line-height:2.3;font-size:19px;font-weight:800;color:#3F2D14">' +
+        ? '<div style="background:#FFFDF4;border:2px solid #E8D3A8;border-radius:14px;padding:14px;line-height:2.1;font-size:17px;font-weight:800;color:#3F2D14">' +
         bodyHtml + '</div>' +
         '<div style="display:flex;gap:8px;margin-top:8px">' +
         '<button class="btn btn-lav" style="flex:1;min-height:52px;font-size:15px" data-act="cnRead" data-v="' +
@@ -2043,6 +2135,30 @@
       return list.filter(function (x) { return x.id === id; })[0] || null;
     },
 
+    /* 按「课号 + 课题」找背诵篇目。
+       ⚠️ 背诵清单里的 id 是「RC_2a_3植物妈妈有办法」这种带前缀的格式，
+       而预习页只知道课号和课题 —— 直接按 id 匹配永远对不上，
+       所以第 5 关「背诵挑战」点了没反应（这个 bug 一直都在）。 */
+    reciteByLesson: function (no, title) {
+      var list = Kid.reciteList();
+      if (!list.length) return null;
+      var flat = function (s) { return String(s || '').replace(/\s+/g, ''); };
+      var key = flat(no) + flat(title);
+
+      /* ① 标题「课号 课题」完全一致 */
+      var hit = list.filter(function (x) { return flat(x.title) === key; })[0];
+      if (hit) return hit;
+      /* ② id 去掉前缀后一致（RC_2a_3植物妈妈有办法 → 3植物妈妈有办法） */
+      hit = list.filter(function (x) {
+        return flat(String(x.id || '').replace(/^RC_/, '').replace(/^2a_/, '').replace(/^2b_/, '')) === key;
+      })[0];
+      if (hit) return hit;
+      /* ③ 宽松：id 或标题里包含课题 */
+      return list.filter(function (x) {
+        return flat(x.title || '').indexOf(flat(title)) >= 0 || flat(x.id || '').indexOf(flat(title)) >= 0;
+      })[0] || null;
+    },
+
     cnReciteHome: function () {
       var list = Kid.reciteList();
       if (Kid.rcId) {
@@ -2530,8 +2646,16 @@
             (global.WordBook.quiz ? global.WordBook.quizPanel() : global.WordBook.panel()) + '</div>';
         }
         html += '<div style="padding:12px 14px 0">' + Kid.enReview() + '</div>';
-        html += '<div style="padding:12px 14px 0">' + Kid.lwtePanel('reading', date) + '</div>';
-        html += '<div style="padding:12px 14px 0">' + Kid.lwtePanel('listening', date) + '</div>';
+        /* 精简模式：去掉朗文阅读题（在纸质书上做），听力改成按 L1、L2… 顺序播放 */
+        var ln2 = Kid.lean();
+        if (!(ln2.on && ln2.noReading)) {
+          html += '<div style="padding:12px 14px 0">' + Kid.lwtePanel('reading', date) + '</div>';
+        }
+        if (ln2.on && ln2.listenSeq) {
+          html += '<div style="padding:12px 14px 0">' + Kid.listenPlayer() + '</div>';
+        } else {
+          html += '<div style="padding:12px 14px 0">' + Kid.lwtePanel('listening', date) + '</div>';
+        }
       }
       if (subj === 'math') {
         html += '<div style="padding:12px 14px 0">' + Kid.mathPanel() + '</div>';
@@ -2666,9 +2790,30 @@
     },
 
     /* ---------------- 渲染入口 ---------------- */
+    /* 使用时间到了 → 除了首页（要打卡）和奖励页，其它板块都锁上 */
+    appLockHtml: function () {
+      var left = S.appLeftSec();
+      var used = Math.round(S.appUsedSec() / 60);
+      var quota = Math.round(S.appQuotaSec() / 60);
+      return '<div class="card mt12" style="background:#FFF8E4;border:2px solid #EFDDB8;text-align:center;padding:20px 14px">' +
+        '<div style="font-size:44px;line-height:1.2">⏳</div>' +
+        '<div class="sec-title" style="font-size:17px;margin-top:6px">今天的使用时间用完啦</div>' +
+        '<div class="muted" style="line-height:1.9;margin-top:6px">' +
+        '今天已经用了 ' + used + ' / ' + quota + ' 分钟。<br>' +
+        '眼睛该休息啦，去外面跑一跑，或者翻本纸质书。<br>' +
+        '<b>每日三项固定任务的打卡不受影响</b>，回首页照样能打卡。<br>' +
+        '明天一早时间会自动补满。' +
+        '</div>' +
+        '<button class="btn btn-green mt12" data-act="tab" data-v="home">🏡 回首页打卡</button>' +
+        '</div>';
+    },
+
     render: function () {
       var html = '';
-      if (Kid.page === 'home') html = Kid.pageHome();
+      var lock = S.appTimeUp() && Kid.page !== 'home' && Kid.page !== 'reward';
+      if (lock) {
+        html = Kid.appLockHtml();
+      } else if (Kid.page === 'home') html = Kid.pageHome();
       else if (Kid.page === 'reward') html = Kid.pageReward();
       else html = Kid.pageSubject(Kid.page);
 
@@ -2684,8 +2829,27 @@
           '<span class="tab-emoji">' + x.e + '</span><span>' + x.t + '</span></button>';
       }).join('');
 
+      /* 顶部剩余时间条（只在首屏显示，不打断操作） */
+      var timeBar = '';
+      if (S.appConf().enable) {
+        var left = S.appLeftSec();
+        var mm = Math.floor(left / 60), ss = left % 60;
+        var total = S.appQuotaSec();
+        var pct = total ? Math.round(left / total * 100) : 0;
+        var col = left <= 60 ? '#E24B4A' : (left <= 300 ? '#EF9F27' : '#5BA82B');
+        timeBar = '<div style="padding:8px 14px 0">' +
+          '<div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#7A6248">' +
+          '<span>⏳ 今天还能用</span>' +
+          '<span style="color:' + col + '">' + mm + ':' + (ss < 10 ? '0' : '') + ss + '</span>' +
+          '<span style="flex:1"></span>' +
+          '<span>（打卡计时不算在内）</span></div>' +
+          '<div style="height:6px;border-radius:4px;background:#EADFC0;overflow:hidden;margin-top:4px">' +
+          '<div style="height:100%;width:' + pct + '%;background:' + col + '"></div></div>' +
+          '</div>';
+      }
+
       return '<div class="app-shell">' +
-        '<div style="height:8px"></div>' + html +
+        '<div style="height:8px"></div>' + timeBar + html +
         '<div style="height:20px"></div>' +
         '</div>' +
         '<div class="tabbar"><div class="tabbar-inner">' + tabs + '</div></div>';
@@ -3041,6 +3205,18 @@
       }
 
       if (name === 'phDel') { E.phraseDel(v); return true; }
+
+      /* 听力顺序播放器：切换课次（到头就停在原地，不绕圈，免得孩子迷路） */
+      if (name === 'listenGo') {
+        var L2 = global.LWTE;
+        var n2 = (L2 && L2.listenings) ? L2.listenings.length : 0;
+        var i2 = parseInt(v, 10);
+        if (isNaN(i2)) return false;
+        if (i2 < 0) i2 = 0;
+        if (i2 > n2 - 1) i2 = n2 - 1;
+        Kid.listenIdx = i2;
+        return true;
+      }
 
       if (name === 'respeech') {
         s.speech = (s.speech || []).filter(function (x) { return x.date !== date; });
@@ -3456,7 +3632,13 @@
 
       /* ---------- 背诵闯关 ---------- */
       if (name === 'rcOpen') {
-        Kid.rcId = v; Kid.rcGame = ''; Kid.rcStep = 0; Kid.rcPick = [];
+        /* 兼容两种传法：「课号|课题」（现在的）和「课号课题」（旧的） */
+        var rid = String(v || '');
+        if (rid.indexOf('|') < 0) {
+          var mm = rid.match(/^(\d+|识字\d+)([\u4e00-\u9fa5].*)$/);
+          if (mm) rid = mm[1] + '|' + mm[2];
+        }
+        Kid.rcId = rid; Kid.rcGame = ''; Kid.rcStep = 0; Kid.rcPick = [];
         Kid.rcLv = 0; Kid.rcResult = null; Kid.rcAudioUrl = '';
         App.render();
         return false;
