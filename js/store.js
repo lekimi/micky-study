@@ -173,6 +173,15 @@
   }
 
   /* 数学趣味闯关的时间管控（妈妈端可改） */
+  /* 整个应用（除每日固定任务打卡计时外）每天最多能用多久 */
+  function defaultAppConf() {
+    return {
+      enable: 1,          // 1 = 启用
+      baseMin: 30,        // 每天 30 分钟
+      bonus: {}           // {'2026-09-22': 10} 妈妈临时加时（分钟）
+    };
+  }
+
   function defaultMathConf() {
     return {
       enable: 1,          // 1 = 启用每日限时
@@ -238,6 +247,17 @@
       math: defaultMath(),       // 数学趣味闯关 {stars,cleared,hintLeft,streak,sudFree...}
       mathConf: defaultMathConf(), // 妈妈端时间管控 {enable,baseMin,maxMin,currency,redeemDay,redeemMin,bonus}
       mathUse: {},               // 闯关计时 {'2026-09-22': 已用秒数}
+      appConf: defaultAppConf(), // 全局使用时长管控 {enable,baseMin,bonus}
+      /* 精简模式（减少屏幕使用）：关掉字词类练习和朗文阅读题，只留最该在屏幕上做的 */
+      lean: {
+        on: 1,           // 1 = 精简（默认开）
+        noChars: 1,      // 去掉「生字闯关」
+        noPreview: 1,    // 去掉「预习探险」
+        noReading: 1,    // 去掉「朗文阅读题」
+        enReviewN: 6,    // 朗文 2A 复习题只出 6 道
+        listenSeq: 1     // 听力按 L1、L2… 顺序播放（孩子在纸质卷子上做）
+      },
+      appUse: {},                // 全局计时 {'2026-09-22': 已用秒数}
       myTasks: [],               // 孩子自加任务 {id,subject,title,date,status,water,note,at,reviewedAt}
       flowers: 0,                // 🌸 小红花（老师作业完成数，不抵水滴）
       hwLog: [],                 // 老师作业打卡记录 {id,date,title,subject}
@@ -375,6 +395,40 @@
       return s.mathConf;
     },
     /* 当天已玩秒数 */
+    /* ---------- 全局使用时长 ---------- */
+    appConf: function () {
+      var s = this.state;
+      if (!s.appConf || typeof s.appConf !== 'object') s.appConf = defaultAppConf();
+      return s.appConf;
+    },
+    appUsedSec: function (date) {
+      date = date || this.dateStr();
+      return (this.state.appUse || {})[date] || 0;
+    },
+    appAddSec: function (n, date) {
+      var s = this.state;
+      if (!s.appUse || typeof s.appUse !== 'object') s.appUse = {};
+      date = date || this.dateStr();
+      s.appUse[date] = (s.appUse[date] || 0) + (n || 0);
+      return s.appUse[date];
+    },
+    appQuotaSec: function (date) {
+      var c = this.appConf();
+      date = date || this.dateStr();
+      if (!c.enable) return 3600 * 24;
+      var bonus = (c.bonus && c.bonus[date]) || 0;
+      return ((c.baseMin || 30) + bonus) * 60;
+    },
+    appLeftSec: function (date) {
+      date = date || this.dateStr();
+      return Math.max(0, this.appQuotaSec(date) - this.appUsedSec(date));
+    },
+    appTimeUp: function (date) {
+      date = date || this.dateStr();
+      if (!this.appConf().enable) return false;
+      return this.appUsedSec(date) >= this.appQuotaSec(date);
+    },
+
     mathUsedSec: function (date) {
       date = date || this.dateStr();
       return (this.state.mathUse || {})[date] || 0;
