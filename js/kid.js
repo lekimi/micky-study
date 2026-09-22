@@ -222,6 +222,11 @@
           if (t.early && !ended && earlyMin > 0) {
             subLine += '<div style="margin-top:4px"><span class="task-tag water">⚡ 现在结束，还能多拿 💧' + earlyMin + '</span></div>';
           }
+          /* 四面八方要去别的 App 打卡：告诉孩子可以离开本页，时间照样走 */
+          if (t.id === 'f4' && !ended) {
+            subLine += '<div class="muted" style="margin-top:4px;font-weight:800;color:#2E7CA8">点「开始计时」后，可以去四面八方 App 打卡，时间照样走；' +
+              '回来这里会自动接着计，到时再点「打卡」就好。</div>';
+          }
         } else {
           subLine += '<div class="muted" style="margin-top:4px;font-weight:700">限时 ' + t.limit +
             ' 分钟' + (t.early ? ' · 提前完成有水滴奖励' : '') + '</div>';
@@ -1697,6 +1702,10 @@
         var end = parseInt(el.getAttribute('data-end'), 10);
         if (!end) continue;
         var left = Math.max(0, Math.floor((end - Date.now()) / 1000));
+        /* 倒计时语音/音乐提醒：只给在设备上做的固定任务响（练字/计算小超市），四面八方去别的 App 不出声 */
+        if (global.Sound && global.Sound.on() && el.getAttribute('data-task') && el.getAttribute('data-task') !== 'f4') {
+          Kid.voiceCue(el.getAttribute('data-task'), left, end);
+        }
         var m = Math.floor(left / 60), sec = left % 60;
         if (left === 0) {
           el.textContent = '⏰ 时间到啦';
@@ -1721,6 +1730,21 @@
       if (!t) return '';
       return '<div class="timer-tick" data-end="' + t.end + '" data-task="' + U.esc(taskId) + '" ' +
         'style="font-size:30px;font-weight:900;color:#2E7CA8;background:#E7F3FF;border:3px solid #A8CBE8;border-radius:16px;padding:8px 20px;display:inline-block;min-width:150px;text-align:center">⏱ --:--</div>';
+    },
+
+    /* 倒计时语音/音乐提醒：每个倒计时只播一次，按剩余秒数触发（10/3/2/1/0） */
+    voiceCue: function (taskId, left, endKey) {
+      if (left > 10 || !global.Sound) return;
+      Kid._cue = Kid._cue || {};
+      var key = taskId + ':' + endKey;
+      var said = Kid._cue[key] || {};
+      if (left === 10 && !said.w10) { said.w10 = 1; global.Sound.warn10(); }
+      else if (left === 3 && !said.c3) { said.c3 = 1; global.Sound.count(3); }
+      else if (left === 2 && !said.c2) { said.c2 = 1; global.Sound.count(2); }
+      else if (left === 1 && !said.c1) { said.c1 = 1; global.Sound.count(1); }
+      else if (left === 0 && !said.fin) { said.fin = 1; global.Sound.finish(); }
+      Kid._cue[key] = said;
+      if (Object.keys(Kid._cue).length > 24) Kid._cue = {};
     },
 
     /* ================= 阅读打卡 · 故事海漂流 ================= */
@@ -3551,6 +3575,7 @@
           return false;
         }
         Kid.timerStart(tid, tmin);
+        if (global.Sound) global.Sound.unlock();   // 借「开始计时」手势解锁音频
         App.render();
         U.toast('开始计时：' + tmin + ' 分钟');
         return false;
