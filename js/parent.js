@@ -406,7 +406,8 @@
       var autoHtml = '<div class="card mt12">' +
         '<div class="sec-title">⚙️ 快捷开关</div>' +
         '<div class="row"><div class="row-main"><div class="row-t">提交自动通过</div>' +
-        '<div class="row-s">打开后孩子提交即刻点亮，我不用逐条审核</div></div>' +
+        '<div class="row-s">默认开着：孩子自己就能走完三项，不用等你点。' +
+        '（他自己加的任务、阅读打卡还是要我来评判）</div></div>' +
         '<button class="pill-btn ' + (s.autoApprove ? 'pill-ok' : 'pill-gray') + '" data-act="toggleAuto">' +
         (s.autoApprove ? '已开启' : '已关闭') + '</button></div>' +
         '<div class="row"><div class="row-main"><div class="row-t">进入密码</div>' +
@@ -858,7 +859,9 @@
       }
 
       if (name === 'toggleAuto') {
-        s.autoApprove = !s.autoApprove; S.save();
+        s.autoApprove = !s.autoApprove;
+        s.autoApproveSet = 1;                 // 妈妈亲手拨过 → 以后尊重她的选择
+        S.save();
         U.toast(s.autoApprove ? '已开启：提交自动通过' : '已关闭：需要我手动审核');
         return true;
       }
