@@ -179,6 +179,8 @@ ok('同一周不重复惩罚', E.settleWeeks().length === 0);
 
 console.log('\n--- 语文讲述评分 ---');
 eval(fs.readFileSync(path.join(dir, 'ai.js'), 'utf8'));
+eval(fs.readFileSync(path.join(dir, 'sound.js'), 'utf8'));
+eval(fs.readFileSync(path.join(dir, 'coach.js'), 'utf8'));
 const AI = window.AI;
 const good = '今天下午在操场上，我和小明一起踢足球。我看到红色的跑道和小明蓝色的球鞋，听到同学们大声喊加油，闻到青草的味道。风吹在脸上凉凉的。因为我很激动，最后我们赢了，我觉得特别开心和自豪。';
 const rg = AI.localScore(good);
