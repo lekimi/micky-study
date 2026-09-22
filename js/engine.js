@@ -606,7 +606,19 @@
        ========================================================= */
 
     /* ---------- 0. 今日讲述：引导式扩写（草稿 + 防刷分 + 素材库） ---------- */
-    SPEECH_DAILY_MAX: 2,        /* 每天最多提交 2 次，第 2 次水滴减半 */
+    /* 每天只讲「一篇」：原来的「再讲一件事」已合并进来——
+       讲完后是「接着把这一篇补得更完整」，改的还是同一篇，不再开第二篇。 */
+    SPEECH_DAILY_MAX: 1,
+    SPEECH_REWORK_MAX: 2,       /* 同一篇最多再补 2 次，水滴只补差额（防止无限刷） */
+
+    /* 今天这篇还能不能再补一次 */
+    speechCanRework: function (date) {
+      var d = date || today();
+      var arr = (st().speech || []).filter(function (x) { return x.date === d; });
+      if (!arr.length) return false;
+      var rec = arr[arr.length - 1];
+      return (rec.reworks || 0) < Engine.SPEECH_REWORK_MAX;
+    },
 
     speechDraftOf: function (date) {
       var s = st();
@@ -614,10 +626,17 @@
       if (!s.speechDraft || s.speechDraft.date !== d) return null;
       return s.speechDraft;
     },
-    speechDraftStart: function (origin, date) {
+    speechDraftStart: function (origin, date, opts) {
       var s = st();
       var d = date || today();
-      s.speechDraft = { date: d, origin: String(origin || '').trim(), text: String(origin || '').trim(), asked: [] };
+      var o = opts || {};
+      s.speechDraft = {
+        date: d,
+        origin: String(origin || '').trim(),
+        text: String(origin || '').trim(),
+        asked: [],
+        cont: o.cont ? 1 : 0       /* 1 = 接着补同一篇 */
+      };
       S.save();
       return s.speechDraft;
     },
@@ -654,9 +673,10 @@
     },
 
     /* 提交结算：水滴只在提交后发，按分数算，且当天第 2 次减半 */
-    finishSpeech2: function (text, origin, scoreResult, date) {
+    finishSpeech2: function (text, origin, scoreResult, date, opts) {
       var s = st();
       var d = date || today();
+      var o = opts || {};
       var score = scoreResult.score;
       var times = Engine.speechCountToday(d) + 1;      /* 这是今天的第几次 */
 
@@ -665,6 +685,34 @@
           : score >= 70 ? { water: 3, sun: 0 }
             : score >= 60 ? { water: 2, sun: 0 }
               : { water: 1, sun: 0 };
+
+      /* 「接着补一补」：改的还是同一篇，不新增一条记录，分数取更高的，水滴只补差额 */
+      if (o.cont) {
+        var arr0 = (s.speech || []).filter(function (x) { return x.date === d; });
+        var rec0 = arr0[arr0.length - 1];
+        if (rec0) {
+          var addW = Math.max(0, rw.water - (rec0.water || 0));
+          var addS = Math.max(0, rw.sun - (rec0.sun || 0));
+          rec0.text = text;
+          rec0.score = Math.max(rec0.score || 0, score);
+          rec0.detail = scoreResult.dims || scoreResult.detail;
+          rec0.tips = scoreResult.tips;
+          rec0.comments = scoreResult.comments;
+          rec0.good = scoreResult.good || [];
+          rec0.reworks = (rec0.reworks || 0) + 1;
+          rec0.water = (rec0.water || 0) + addW;
+          rec0.sun = (rec0.sun || 0) + addS;
+          /* 内容变了，旧的改写作废，要重新生成 */
+          rec0.rewrite = ''; rec0.rewriteChanges = []; rec0.rewriteMethods = []; rec0.rewriteOpen = 0;
+          s.water = (s.water || 0) + addW;
+          s.sun = (s.sun || 0) + addS;
+          if (addW) S.addLedger(addW, 'water', '🎤 讲述补写：' + score + ' 分', d);
+          if (addS) S.addLedger(addS, 'sun', '🎤 讲述补写优秀', d);
+          s.speechDraft = null;
+          S.save();
+          return { rec: rec0, water: addW, sun: addS, times: 1, cont: true };
+        }
+      }
 
       var water = rw.water;
       if (times > 1) water = Math.max(1, Math.floor(water / 2));   /* 第二次减半 */
