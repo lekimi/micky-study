@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#5BA82B">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Micky 植物大战僵尸学习工作台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Tailwind 主题：草绿 / 棕米 / 马卡龙，后续扩展直接用 class 调用
+    if (window.tailwind) {
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              grass: { DEFAULT: '#5BA82B', light: '#7CC142', dark: '#3D7A16' },
+              cream: { DEFAULT: '#F7EBD1', deep: '#EFDDB8', line: '#C9A961' },
+              sunny: '#FFD54A',
+              dropy: '#4FC3F7',
+              maca: { pink: '#FFB7C5', lav: '#C9B6E4', mint: '#A8E6CF', lemon: '#FFE3A3', sky: '#A8D8EA' }
+            },
+            borderRadius: { xl2: '18px', xl3: '24px' }
+          }
+        }
+      };
+    }
+  </script>
+  <link rel="stylesheet" href="css/pvz.css">
+</head>
+
+<body class="app-root kid-mode">
+
+  <div id="app"></div>
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root"></div>
+
+  <script src="js/store.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="data/lwte2a.js"></script>
+  <script src="data/lwte2a_review.js"></script>
+  <script src="data/cn_preview.js"></script>
+  <script src="data/chinese2a.js"></script>
+  <script src="data/cn_text_2a.js"></script>
+  <script src="data/cn_text_2b.js"></script>
+  <script src="data/words2a.js"></script>
+  <script src="js/cnquiz.js"></script>
+  <script src="js/mathpuz.js"></script>
+  <script src="js/math.js"></script>
+  <script src="js/wordbook.js"></script>
+  <script src="js/kid.js"></script>
+  <script src="js/parent.js"></script>
+  <script src="js/app.js"></script>
+
+  <script>
+    // Tailwind CDN 没加载成功时也不至于白屏：给个兜底提示
+    setTimeout(function () {
+      if (typeof window.tailwind === 'undefined') {
+        console.warn('Tailwind CDN 未加载，页面使用自带样式运行');
+      }
+    }, 3000);
+  </script>
+</body>
+
+</html>
