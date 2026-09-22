@@ -440,40 +440,162 @@
         '<div style="padding:12px 14px 0">' + Kid.plantCard() + Kid.movieCard() + '</div>';
     },
 
-    /* ---------------- 讲述工坊（语文） ---------------- */
-    speechPanel: function (date) {
-      var done = E.speechToday(date);
-      if (done) {
-        return '<div class="card card-cream mt12">' +
-          '<div class="sec-title">🎤 今日讲述 · 已完成</div>' +
-          '<div style="text-align:center;padding:4px 0 10px">' +
-          '<div style="font-size:44px;font-weight:900;color:#E0A020;line-height:1.1">' + done.score + '<span style="font-size:18px">分</span></div>' +
-          '<div class="muted" style="font-weight:800">' + U.esc(global.AI.rewardText(done)) + '</div>' +
-          '</div>' +
-          (done.comments || []).map(function (c) {
-            return '<div style="background:#FFF3CC;border-radius:12px;padding:8px 10px;margin-bottom:6px;font-size:14px;color:#7A5B33">💛 ' + U.esc(c) + '</div>';
-          }).join('') +
-          (done.tips || []).map(function (c) {
-            return '<div style="background:#EAF3D8;border-radius:12px;padding:8px 10px;margin-bottom:6px;font-size:14px;color:#4B6B1E">🌱 ' + U.esc(c) + '</div>';
-          }).join('') +
-          '<button class="btn btn-ghost mt8" data-act="respeech">再讲一次（重新打分）</button>' +
+    /* ---------------- 讲述工坊（语文）· AI 引导式扩写 ---------------- */
+
+    /* 已完成的成绩单 */
+    speechDoneHtml: function (done) {
+      var sc = global.SpeechCoach;
+      var dims = (done.detail || []).map(function (d) {
+        return '<span class="task-tag ' + (d.hit ? 'ok' : '') + '" style="font-size:12px">' +
+          (d.icon || '') + ' ' + U.esc(d.label) + (d.hit ? ' ✓' : ' —') + '</span>';
+      }).join(' ');
+
+      /* 扩写前后对比 */
+      var cmp = '';
+      if (done.origin && done.origin !== done.text) {
+        cmp = '<div style="margin-top:10px">' +
+          '<div class="sec-title" style="font-size:14px">📈 扩写前后</div>' +
+          '<div style="background:#F1EFE8;border-radius:12px;padding:10px;margin-bottom:6px">' +
+          '<div style="font-size:11px;font-weight:900;color:#7A6248">最开始（' + (sc ? sc.len(done.origin) : done.origin.length) + ' 字）</div>' +
+          '<div style="font-weight:700;color:#5C4322;line-height:1.7">' + U.esc(done.origin) + '</div></div>' +
+          '<div style="background:#E9F7E9;border-radius:12px;padding:10px">' +
+          '<div style="font-size:11px;font-weight:900;color:#2F6B3A">补充后（' + (sc ? sc.len(done.text) : done.text.length) + ' 字）</div>' +
+          '<div style="font-weight:700;color:#2F6B3A;line-height:1.7">' + U.esc(done.text) + '</div></div>' +
           '</div>';
       }
 
-      var senses = ['看到 👀', '听到 👂', '闻到 👃', '尝到 👅', '摸到 ✋'];
+      return '<div class="card card-cream mt12">' +
+        '<div class="sec-title">🎤 今日讲述 · 已完成' + ((done.times || 1) > 1 ? '（第 ' + done.times + ' 次）' : '') + '</div>' +
+        '<div style="text-align:center;padding:4px 0 10px">' +
+        '<div style="font-size:44px;font-weight:900;color:#E0A020;line-height:1.1">' + done.score + '<span style="font-size:18px">分</span></div>' +
+        '<div class="muted" style="font-weight:800">' + U.esc(global.AI.rewardText(done)) + '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">' + dims + '</div>' +
+        (done.comments || []).map(function (c) {
+          return '<div style="background:#FFF3CC;border-radius:12px;padding:8px 10px;margin-bottom:6px;font-size:14px;color:#7A5B33">💛 ' + U.esc(c) + '</div>';
+        }).join('') +
+        (done.tips || []).map(function (c) {
+          return '<div style="background:#EAF3D8;border-radius:12px;padding:8px 10px;margin-bottom:6px;font-size:14px;color:#4B6B1E">🌱 ' + U.esc(c) + '</div>';
+        }).join('') +
+        cmp +
+        '<button class="btn btn-ghost mt8" data-act="respeech">再讲一次</button>' +
+        '</div>';
+    },
+
+    /* 引导中的对话界面 */
+    speechCoachHtml: function (date) {
+      var sc = global.SpeechCoach;
+      if (!sc) return '';
+      var d = E.speechDraftOf(date);
+      var cur = Kid.spAsk || null;
+
+      /* 进度条：八个维度补了几个 */
+      var got = sc.covered(d.text);
+      var miss = sc.missing(d.text);
+      var pct = Math.round(got.length / sc.GUIDE.length * 100);
+
+      var chips = sc.GUIDE.map(function (g) {
+        var on = !!sc.has(d.text, g.words);
+        return '<span class="task-tag ' + (on ? 'ok' : '') + '" style="font-size:12px;opacity:' + (on ? 1 : 0.55) + '">' +
+          g.icon + ' ' + g.label + '</span>';
+      }).join(' ');
+
+      /* 老师这一轮问的话 */
+      var askHtml = '';
+      if (cur) {
+        askHtml = '<div style="background:#EAF3FB;border:2px solid #B5D4F4;border-radius:14px;padding:12px;margin-top:10px">' +
+          '<div style="font-size:12px;font-weight:900;color:#185FA5;margin-bottom:4px">' +
+          '👩‍🏫 老师想问你（第 ' + cur.round + ' 轮 · ' + cur.icon + ' ' + U.esc(cur.label) + '）</div>' +
+          '<div style="font-size:17px;font-weight:900;color:#0C447C;line-height:1.6">' + U.esc(cur.ask) + '</div>' +
+          '</div>' +
+          '<textarea class="field mt8" id="sp-ans" rows="3" placeholder="把你想到的话写在这里…" style="min-height:96px;line-height:1.8"></textarea>' +
+          '<div style="display:flex;gap:8px;margin-top:8px">' +
+          '<button class="btn btn-green" style="flex:1;min-height:52px" data-act="spAnswer">说好了，加上去</button>' +
+          '<button class="btn btn-ghost" style="width:auto;min-height:52px;padding:10px 16px;font-size:14px" data-act="spSkip">这个我没有</button>' +
+          '</div>';
+      } else if (miss.length) {
+        askHtml = '<button class="btn btn-lav mt8" data-act="spAsk">🤔 让老师再问我一句</button>';
+      }
+
+      return '<div class="card card-cream mt12">' +
+        '<div class="sec-title">🎤 今日讲述 · 和老师一起把它说完整</div>' +
+        '<div class="muted" style="font-size:13px">' +
+        '老师不会替你写，只会一句一句问你。你想到什么就说什么，说不出来可以点「这个我没有」。' +
+        '</div>' +
+        '<div style="height:12px;border-radius:6px;background:#EADFC0;overflow:hidden;margin:10px 0 6px">' +
+        '<div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,#8FD44A,#5BA82B)"></div></div>' +
+        '<div class="muted" style="font-size:12px;font-weight:800">已经补上 ' + got.length + ' / ' + sc.GUIDE.length + ' 个方面</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;margin:8px 0">' + chips + '</div>' +
+        '<div style="background:#FFFDF4;border:2px solid #EFDDB8;border-radius:14px;padding:12px">' +
+        '<div style="font-size:11px;font-weight:900;color:#B07A2E">你现在写的（' + sc.len(d.text) + ' 字）</div>' +
+        '<div style="font-weight:700;color:#5C4322;line-height:1.9;margin-top:4px">' + U.esc(d.text) + '</div>' +
+        '</div>' +
+        askHtml +
+        '<button class="btn btn-ghost mt8" data-act="spFinish">✋ 我说完了，就这样</button>' +
+        '</div>';
+    },
+
+    speechPanel: function (date) {
+      var done = E.speechToday(date);
+      var d = E.speechDraftOf(date);
+
+      /* 今天提交次数用完 → 只展示成绩 */
+      if (done && !d && !E.speechCanSubmit(date)) {
+        return Kid.speechDoneHtml(done) +
+          '<div class="card mt12"><div class="muted" style="padding:6px 0;text-align:center">' +
+          '今天已经讲了 ' + E.speechCountToday(date) + ' 次啦，明天再来～</div></div>';
+      }
+      if (d) return Kid.speechCoachHtml(date);
+      if (done) return Kid.speechDoneHtml(done) +
+        '<div class="card card-cream mt12">' +
+        '<div class="sec-title" style="font-size:15px">🎤 再讲一件事</div>' +
+        '<div class="muted" style="font-size:13px">今天还能再讲 ' + (E.SPEECH_DAILY_MAX - E.speechCountToday(date)) + ' 次（第二次水滴减半）。</div>' +
+        Kid.speechStartHtml() +
+        '</div>';
+
+      /* 全新的开始 */
       return '<div class="card card-cream mt12">' +
         '<div class="sec-title">🎤 今日讲述：说一件今天最难忘的事</div>' +
-        '<div class="muted" style="line-height:1.9">' +
-        '先说个大概：<b>什么时候？在哪里？和谁？发生什么？</b><br>' +
-        '再慢慢加料——把你看到的、听到的、闻到的、尝到的、摸到的写进去，画面就出来啦。' +
+        '<div class="muted" style="font-size:13px;line-height:1.9">' +
+        '<b>先一句话说出来就行</b>，哪怕是「今天我和小明玩」也行。<br>' +
+        '然后老师会一句一句问你，帮你把它说完整——' +
+        '<b>不是替你写，是问你</b>，答案都在你自己脑子里。' +
         '</div>' +
-        '<div class="flex mt8" style="flex-wrap:wrap;gap:6px">' +
-        senses.map(function (x) { return '<span class="task-tag water" style="font-size:12px">' + x + '</span>'; }).join('') +
-        '</div>' +
-        '<textarea class="field mt8" id="speech-text" rows="6" placeholder="今天最让我难忘的是……" style="min-height:130px;line-height:1.8"></textarea>' +
-        '<div class="muted mt8">不会写的字可以用拼音，妈妈帮你补也行。</div>' +
-        '<button class="btn btn-green mt8" data-act="speechSubmit">我讲完啦，打分！</button>' +
+        Kid.speechStartHtml() +
         '</div>';
+    },
+
+    /* 开头输入框（两处复用） */
+    speechStartHtml: function () {
+      return '<textarea class="field mt8" id="speech-text" rows="3" ' +
+        'placeholder="今天最让我难忘的是……（一句话就行）" style="min-height:96px;line-height:1.8"></textarea>' +
+        '<div class="muted mt8" style="font-size:12px">不会写的字可以用拼音。</div>' +
+        '<button class="btn btn-green mt8" data-act="speechStart">开始，让老师问我</button>' +
+        '<button class="btn btn-ghost mt8" data-act="speechDirect" style="font-size:14px">今天不想被问，我自己写完</button>';
+    },
+
+    /* ✨ 我的素材库 */
+    phrasePanel: function () {
+      var list = E.phraseList();
+      var rows = list.length
+        ? list.slice(0, 12).map(function (p) {
+          return '<div class="task-card" style="margin-bottom:8px">' +
+            '<div class="task-emoji">✨</div>' +
+            '<div style="flex:1;min-width:0">' +
+            '<div class="task-title" style="font-size:15px;line-height:1.6">' + U.esc(p.text) + '</div>' +
+            '<div><span class="task-tag water">' + U.esc(p.why || '好句') + '</span>' +
+            '<span class="task-tag">' + p.date + '</span></div>' +
+            '</div>' +
+            '<button class="pill-btn pill-no" style="min-height:52px" data-act="phDel" data-v="' + p.id + '">×</button>' +
+            '</div>';
+        }).join('')
+        : '<div class="empty">还没有存过好句子。每次讲完，老师会挑出写得最好的一两句，你可以存进来。</div>';
+
+      return '<div class="card mt12" style="background:#FFFDF4;border:2px solid #EFDDB8">' +
+        '<div class="sec-title">✨ 我的素材库（' + list.length + '）</div>' +
+        '<div class="muted" style="font-size:12px;margin-bottom:8px">' +
+        '攒起来干什么？以后写作文、看图说话的时候翻一翻，就能用上自己说过的好句子。' +
+        '</div>' + rows + '</div>';
     },
 
     /* ---------------- 朗文随机抽题 ---------------- */
@@ -2398,6 +2520,7 @@
 
       if (subj === 'chinese') {
         html += '<div style="padding:12px 14px 0">' + Kid.speechPanel(date) + '</div>';
+        html += '<div style="padding:12px 14px 0">' + Kid.phrasePanel() + '</div>';
         html += '<div style="padding:12px 14px 0">' + Kid.cnPanel() + '</div>';
       }
       if (subj === 'english') {
@@ -2762,11 +2885,111 @@
         return false;
       }
 
+      /* ---------- 讲述：引导式扩写 ---------- */
+      if (name === 'speechStart') {
+        var st0 = document.getElementById('speech-text');
+        var t0 = st0 ? st0.value.trim() : '';
+        if (t0.length < 5) {
+          U.modal({ emoji: '🎤', title: '再多说一点点', text: '至少写 5 个字，老师才好问你哦～\n试试「今天在操场，我和……」' });
+          return false;
+        }
+        if (!E.speechCanSubmit(date)) { U.toast('今天已经讲完啦，明天再来'); return false; }
+        E.speechDraftStart(t0, date);
+        Kid.spAsk = null;
+        U.modal({
+          emoji: '📖', title: '老师正在想问题…',
+          text: (s.ai && s.ai.enabled) ? '请 AI 老师出题，稍等一下' : '马上就好',
+          dismissible: false, buttons: []
+        });
+        global.SpeechCoach.guide(t0, [], s.kidName, s.ai).then(function (g) {
+          Kid.spAsk = g;
+          if (!g) { U.toast('你已经写得挺完整的了，可以直接收尾'); }
+          global.App.render();
+        });
+        return false;
+      }
+
+      /* 不想被引导，自己直接写完（高敏感孩子需要这个出口） */
+      if (name === 'speechDirect') {
+        if (!E.speechCanSubmit(date)) { U.toast('今天已经讲完啦，明天再来'); return false; }
+        return Kid.act('speechSubmit');
+      }
+
+      if (name === 'spAsk') {
+        var d0 = E.speechDraftOf(date);
+        if (!d0) return true;
+        global.SpeechCoach.guide(d0.text, d0.asked, s.kidName, s.ai).then(function (g) {
+          Kid.spAsk = g;
+          global.App.render();
+        });
+        return false;
+      }
+
+      if (name === 'spAnswer') {
+        var d1 = E.speechDraftOf(date);
+        if (!d1) return true;
+        var ea = document.getElementById('sp-ans');
+        var ans = ea ? ea.value.trim() : '';
+        if (ans.length < 2) { U.toast('把你想到的话写下来吧，哪怕几个字'); return false; }
+        E.speechDraftAppend(ans, Kid.spAsk ? Kid.spAsk.key : '');
+        Kid.spAsk = null;
+        /* 补完自动问下一句 */
+        var d1b = E.speechDraftOf(date);
+        global.SpeechCoach.guide(d1b.text, d1b.asked, s.kidName, s.ai).then(function (g) {
+          Kid.spAsk = g;
+          global.App.render();
+          if (g) U.toast('加上去啦！老师又问了一句');
+          else U.toast('各个方面都补到了，可以收尾啦');
+        });
+        return true;
+      }
+
+      if (name === 'spSkip') {
+        if (Kid.spAsk) E.speechDraftSkip(Kid.spAsk.key);
+        Kid.spAsk = null;
+        var d2 = E.speechDraftOf(date);
+        if (d2) {
+          global.SpeechCoach.guide(d2.text, d2.asked, s.kidName, s.ai).then(function (g) {
+            Kid.spAsk = g; global.App.render();
+          });
+        }
+        return false;
+      }
+
+      /* 收尾 → 必须孩子确认「已完整、不再改」 */
+      if (name === 'spFinish') {
+        var d3 = E.speechDraftOf(date);
+        if (!d3) return true;
+        var sc0 = global.SpeechCoach;
+        var n0 = sc0 ? sc0.len(d3.text) : d3.text.length;
+        if (n0 < 15) {
+          U.modal({
+            emoji: '🎤', title: '再多说一点点',
+            text: '现在只有 ' + n0 + ' 个字，像一句大白话。\n一篇合格的日记要有情节、有细节、有感受——让老师再问你几句？',
+            buttons: [
+              { text: '好，让老师问我', cls: 'btn-green', onClick: function (c) { c(); Kid.act('spAsk'); } },
+              { text: '就这样吧', cls: 'btn-ghost' }
+            ]
+          });
+          return false;
+        }
+        U.confirm('故事已经完整了吗？',
+          '提交之后就打分给水滴了，不能再改。\n（现在一共 ' + n0 + ' 个字）',
+          function () { Kid.act('speechSubmit'); }, '是的，讲完啦');
+        return false;
+      }
+
       if (name === 'speechSubmit') {
         var el0 = document.getElementById('speech-text');
-        var text = el0 ? el0.value.trim() : '';
-        if (text.length < 5) {
+        var dft = E.speechDraftOf(date);
+        var text = dft ? dft.text : (el0 ? el0.value.trim() : '');
+        var origin = dft ? dft.origin : '';
+        if (!text || text.length < 5) {
           U.modal({ emoji: '🎤', title: '再多说一点点', text: '至少写 5 个字，老师才好打分哦～\n试试「今天在操场，我和……」' });
+          return false;
+        }
+        if (!E.speechCanSubmit(date)) {
+          U.toast('今天已经讲 ' + E.speechCountToday(date) + ' 次啦，明天再来');
           return false;
         }
         U.modal({
@@ -2774,19 +2997,50 @@
           text: (s.ai && s.ai.enabled) ? '正在请 AI 老师点评，稍等一下' : '马上就好',
           dismissible: false, buttons: []
         });
-        global.AI.score(text, s.ai).then(function (res) {
-          E.finishSpeech(text, res);
+        global.SpeechCoach.score(text, origin, s.kidName, s.ai).then(function (res) {
+          var fin = E.finishSpeech2(text, origin, res, date);
+          Kid.spAsk = null;
           var face = res.score >= 90 ? '🏆' : res.score >= 80 ? '🌟' : res.score >= 70 ? '🌻' : res.score >= 60 ? '🌱' : '💪';
+          var reward = '获得 💧 ' + fin.water + (fin.sun ? ' + ☀️ ' + fin.sun : '');
+          if (fin.times > 1) reward += '（今天第 ' + fin.times + ' 次，水滴减半）';
+
+          /* 好词好句：问孩子要不要存进素材库 */
+          var good = res.good || [];
+          var body = '';
+          if (good.length) {
+            body = '<div style="text-align:left;margin-top:8px">' +
+              '<div style="font-size:12px;font-weight:900;color:#B07A2E;margin-bottom:6px">🌟 老师觉得这句写得特别好：</div>' +
+              good.slice(0, 1).map(function (g) {
+                return '<div style="background:#FFF3CC;border-radius:12px;padding:10px;font-weight:800;color:#5C4322;line-height:1.7">' +
+                  U.esc(g.text) + '</div>' +
+                  '<div class="muted" style="font-size:12px;margin-top:4px">' + U.esc(g.why) + '</div>';
+              }).join('') + '</div>';
+          }
+
           U.modal({
             emoji: face,
-            title: res.score + ' 分！' + global.AI.rewardText({ score: res.score }),
+            title: res.score + ' 分！' + reward,
             text: (res.comments || []).concat(res.tips || []).join('\n'),
-            buttons: [{ text: '收下奖励！', cls: 'btn-green', onClick: function (c) { c(); global.App.afterChange(); } }]
+            body: body,
+            buttons: good.length ? [
+              {
+                text: '存进素材库 ✨', cls: 'btn-lav', onClick: function (c) {
+                  c();
+                  good.slice(0, 1).forEach(function (g) { E.phraseAdd(g.text, g.why); });
+                  U.toast('存好啦，写作文时可以翻出来用');
+                  global.App.afterChange();
+                }
+              },
+              { text: '好！', cls: 'btn-green', onClick: function (c) { c(); global.App.afterChange(); } }
+            ] : [
+              { text: '好！', cls: 'btn-green', onClick: function (c) { c(); global.App.afterChange(); } }
+            ]
           });
-          if (res.fallbackReason) U.toast('AI 接口没连上，已用本地评分');
         });
         return false;
       }
+
+      if (name === 'phDel') { E.phraseDel(v); return true; }
 
       if (name === 'respeech') {
         s.speech = (s.speech || []).filter(function (x) { return x.date !== date; });
