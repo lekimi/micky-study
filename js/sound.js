@@ -12,6 +12,8 @@
 
   var S = global.Store;
   var _ctx = null;
+  var _alive = [];        /* 正在响（或已排队）的音符，点了「停」要能掐掉 */
+  var _speaking = 0;      /* 语音合成是不是正在说 */
 
   function audioCtx() {
     try {
@@ -42,6 +44,13 @@
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.exponentialRampToValueAtTime(v, t0 + 0.02);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+      var rec = { o: o, g: g };
+      o.onended = function () {
+        var i = _alive.indexOf(rec);
+        if (i >= 0) _alive.splice(i, 1);
+      };
+      _alive.push(rec);
+      if (_alive.length > 24) _alive.splice(0, _alive.length - 24);
       o.start(t0); o.stop(t0 + d + 0.03);
     } catch (e) { }
   }
@@ -57,12 +66,57 @@
       for (var i = 0; i < vs.length; i++) {
         if (/zh|cmn|chinese|中文|普通话/i.test((vs[i].lang || '') + (vs[i].name || ''))) { u.voice = vs[i]; break; }
       }
+      _speaking = 1;
+      u.onend = function () { _speaking = 0; };
+      u.onerror = function () { _speaking = 0; };
       global.speechSynthesis.speak(u);
-    } catch (e) { }
+    } catch (e) { _speaking = 0; }
+  }
+
+  /* 🔇 立刻闭嘴：掐掉语音 + 掐掉所有还在响/已排队的音符 */
+  function stop() {
+    _speaking = 0;
+    try { if ('speechSynthesis' in global) global.speechSynthesis.cancel(); } catch (e) { }
+    _alive.slice().forEach(function (r) {
+      try {
+        r.g.gain.cancelScheduledValues(0);
+        r.g.gain.setValueAtTime(0.0001, 0);
+        r.o.stop(0);
+      } catch (e) { }
+    });
+    _alive.length = 0;
+  }
+
+  /* 现在是不是还在出声（语音在说 / 音符在响） */
+  function isPlaying() {
+    if (_speaking) return true;
+    if (_alive.length) return true;
+    try { return !!(('speechSynthesis' in global) && global.speechSynthesis.speaking); } catch (e) { return false; }
   }
 
   function on() {
-    try { return !!(S && S.state && S.state.sound && S.state.sound.on); } catch (e) { return false; }
+    try {
+      var sd = S && S.state && S.state.sound;
+      if (!sd || !sd.on) return false;
+      /* 「今天都不再响」只在今天生效，第二天自动恢复 */
+      if (sd.muteDate && S.dateStr && sd.muteDate === S.dateStr()) return false;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /* 🚫 今天剩下的提醒都不出声（明天自动恢复） */
+  function muteToday() {
+    try {
+      stop();
+      if (!S.state.sound) S.state.sound = { on: 1, muteDate: '' };
+      S.state.sound.muteDate = S.dateStr();
+      S.save();
+    } catch (e) { }
+  }
+  function unmute() {
+    try {
+      if (S.state.sound) { S.state.sound.muteDate = ''; S.save(); }
+    } catch (e) { }
   }
 
   /* 剩 10 秒：温柔预告 + 两声轻提示音 */
@@ -84,7 +138,7 @@
     tone(523.25, 0.18, 'sine', 0.2, 0.0);
     tone(659.25, 0.18, 'sine', 0.2, 0.16);
     tone(783.99, 0.18, 'sine', 0.2, 0.32);
-    tone(1046.5, 0.34, 'sine', 0.2, 0.48);
+      tone(1046.5, 0.34, 'sine', 0.2, 0.48);
     speak('时间到啦！你今天特别认真，给自己鼓个掌！');
   }
 
@@ -92,6 +146,10 @@
     on: on,
     unlock: unlock,
     speak: speak,
+    stop: stop,
+    isPlaying: isPlaying,
+    muteToday: muteToday,
+    unmute: unmute,
     warn10: warn10,
     count: count,
     finish: finish,
