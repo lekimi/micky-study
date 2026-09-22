@@ -395,8 +395,14 @@
           '· 语文：去掉生字闯关、预习探险（字词类改在纸质书上做）<br>' +
           '· 英语：去掉朗文阅读题<br>' +
           '· 英语：复习题只出 6 道语法题<br>' +
-          '· 英语：听力按 L1、L2… 顺序播放，孩子在纸质卷子上做' +
-          '</div>'
+          '· 英语：听力按 L1、L2… 顺序播放，孩子在纸质卷子上做<br>' +
+          '· <b>先做完正事</b>：三项固定任务没完成时，其它板块先锁住' +
+          '</div>' +
+          '<div class="row" style="margin-top:8px"><div class="row-main">' +
+          '<div class="row-t">先做完正事（治「到处晃荡」）</div>' +
+          '<div class="row-s">关掉后可以随时进任何板块</div></div>' +
+          '<button class="pill-btn ' + (ln4.afterTasks ? 'pill-ok' : 'pill-gray') + '" style="min-height:44px" data-act="leanAfter">' +
+          (ln4.afterTasks ? '已开启' : '已关闭') + '</button></div>'
           : '') +
         '</div>';
 
@@ -739,6 +745,15 @@
       var s = S.state;
 
       if (name === 'ptab') { Parent.page = v; return true; }
+
+      /* 先做完正事 */
+      if (name === 'leanAfter') {
+        var L5 = global.Kid.lean();
+        L5.afterTasks = L5.afterTasks ? 0 : 1;
+        S.save();
+        U.toast(L5.afterTasks ? '已开启：先做完任务才解锁' : '已关闭：随时能进任何板块');
+        return true;
+      }
 
       /* 精简模式 */
       if (name === 'leanToggle') {
