@@ -228,7 +228,9 @@
       days: {},                  // {'2026-09-22':{bonus,zombieMoved,allDone}}
       dictRound: 0,              // 听写第几组（每组 10 个词，跨单元打散）
       weekPenalty: {},           // {'2026-09-21':true} 每周任务未完成的惩罚只算一次
-      speech: [],                // 讲述练习记录 {id,date,text,score,detail,water,sun}
+      speech: [],                // 讲述练习记录 {id,date,text,origin,score,detail,water,sun}
+      speechDraft: null,         // 讲述引导中的草稿 {date,origin,text,asked[],mode}
+      phraseBook: [],            // ✨ 我的素材库/好词好句本 {id,text,why,date,at}
       quiz: [],                  // 朗文练习记录 {id,date,ref,kind,correct,total,water}
       pv: {},                    // 预习进度 {'2a|识字4 田家四季歌':{read,ask,boss,sum,done}}
       readLog: [],               // 阅读打卡 {id,date,book,minutes,early,sun,water}
