@@ -256,10 +256,14 @@ console.log('  单元 8 | 课 ' + cnLessons + ' | 会写字 ' + cnWrite + ' | �
 console.log('\n--- 页面渲染冒烟 ---');
 // 渲染需要 UI / Kid / Parent 模块（它们只在 render 时才碰 DOM）
 eval(fs.readFileSync(path.join(dir, 'ui.js'), 'utf8'));
+eval(fs.readFileSync(path.join(dir, 'speech.js'), 'utf8'));
+eval(fs.readFileSync(path.join(dir, 'picwrite.js'), 'utf8'));
+eval(fs.readFileSync(path.join(dir, 'asr.js'), 'utf8'));
 eval(fs.readFileSync(path.join(dir, 'kid.js'), 'utf8'));
 eval(fs.readFileSync(path.join(dir, 'parent.js'), 'utf8'));
-eval(fs.readFileSync(path.join(dir, 'picwrite.js'), 'utf8'));
 ok('Kid / Parent 模块加载', !!global.Kid && !!global.Parent);
+ok('SpeechCoach / PicWrite / Asr 模块加载',
+  !!global.SpeechCoach && !!global.PicWrite && !!global.Asr);
 S.state.tasks.push({ id: 'wkA', title: '土豆老师 P12-13', emoji: '📐', kind: 'weekly', subject: 'math', weekStart: mon, due: fri });
 S.state.tasks.push({ id: 'scA', title: '校内：朗读第5课', emoji: '🏫', kind: 'school', subject: 'chinese', date: today });
 ['home', 'chinese', 'math', 'english', 'other', 'reward'].forEach(function (p) {
@@ -282,8 +286,64 @@ ok('英语页含顺序听力播放器', he.indexOf('朗文听力') > 0 && he.ind
 ok('精简模式下英语页不含阅读题', he.indexOf('朗文阅读练习') < 0);
 global.Kid.page = 'chinese';
 ok('语文页含讲述工坊', global.Kid.render().indexOf('今日讲述') > 0);
-ok('语文页含看图写话', global.Kid.render().indexOf('看图写话') > 0);
+/* 看图写话已合并进「今日讲述」：平时不单独占一块，入口在讲述里给 */
+ok('语文页含看图写话入口（合并后）', global.Kid.render().indexOf('看图写话') > 0);
+ok('语文页含语音输入入口', global.Kid.render().indexOf('spMic') > 0);
+ok('语文页含找话题方向（练观察力）', global.Kid.render().indexOf('不知道写什么') > 0);
 ok('语文页含语文学习园入口', global.Kid.render().indexOf('语文学习园') > 0);
+/* 看图写话：点「给我一幅图」→ 出现选图；选了图 → 进入写图模式 */
+(function () {
+  const K = global.Kid, P = global.PicWrite, SC = global.SpeechCoach;
+  K.picOpen = 0;
+  ok('平时不显示独立看图写话块', P.panel() === '');
+  K.picOpen = 1;
+  const pick = P.panel();
+  ok('点「给我一幅图」后出现选图列表', pick.indexOf('picPick') > 0);
+  ok('选图页能返回自己讲', pick.indexOf('picBack') > 0);
+  P.act('picPick', 'P1');
+  const inPic = P.panel();
+  ok('选图后进入看图写话模式', inPic.indexOf('看图写话') > 0 && inPic.indexOf('spFinish') > 0);
+  P.act('picQuit');                       // 还原，别影响后面的测试
+  K.picOpen = 0;
+  /* 好词好句 + 口语整理 */
+  ok('好词好句库按维度可取', SC.phrasesFor('feel').length > 0);
+  ok('整理能去掉重复', SC.tidyText('今天今天天气很好天气很好') !== '今天今天天气很好天气很好');
+})();
+/* 倒计时结束后绝不能每秒重绘 —— 曾经导致「时间到了」按钮狂闪、
+   讲述输入框被反复重建没法打字。守卫必须记在模块级 map 里（不能只记 DOM 属性）。 */
+(function () {
+  const realQSA = global.document.querySelectorAll;
+  const K = global.Kid;
+  const tm = K.timerStart('f2', 10);
+  tm.end = Date.now() - 3000;                       // 已结束、还没打卡
+  function fresh() {
+    return {
+      _a: { 'data-task': 'f2', 'data-end': String(tm.end) },
+      getAttribute(k) { return this._a[k] || null; },
+      setAttribute(k, v) { this._a[k] = v; },
+      textContent: '', style: {}
+    };
+  }
+  let els = [fresh()];
+  global.document.querySelectorAll = () => els;
+  K._ended = {};
+  K.tickTimers();                                   // 第一次：应该记住它
+  const n1 = Object.keys(K._ended).length;
+  els = [fresh()];                                  // 模拟重绘后元素换新（属性丢失）
+  K.tickTimers(); K.tickTimers(); K.tickTimers();
+  const n2 = Object.keys(K._ended).length;
+  global.document.querySelectorAll = realQSA;
+  ok('倒计时结束被记住（触发一次重绘）', n1 === 1);
+  ok('重绘换掉元素后不会再次触发重绘', n2 === 1);
+  K._ended = {}; K.timerEnd('f2');
+})();
+/* 升格改写：本地兜底要能出改写和改动说明 */
+(function () {
+  const r = global.AI.localPolish('我和小明去操场玩。我们踢球了。');
+  ok('升格改写有改写结果', !!r.rewrite && r.rewrite.length > 0);
+  ok('升格改写给出了改动理由', (r.changes || []).length > 0);
+  ok('升格改写保留孩子自己的内容', r.rewrite.indexOf('小明') >= 0);
+})();
 /* 单独验「每日固定任务按顺序做」：一项通过才解锁下一项；
    计算小超市在「等妈妈确认」期间，下一项也能先开始计时（其它板块不再被锁） */
 (function () {
