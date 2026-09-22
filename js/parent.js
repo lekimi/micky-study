@@ -351,6 +351,55 @@
         '错题本里的词答对一次就自动出本子，不用你手动清。' +
         '</div></div>';
 
+      /* ===== ⏳ 全局使用时长（除打卡外最多 30 分钟） ===== */
+      var ac = S.appConf();
+      var aUsed = Math.round(S.appUsedSec(date) / 60);
+      var aQuota = Math.round(S.appQuotaSec(date) / 60);
+      var aBonus = (ac.bonus && ac.bonus[date]) || 0;
+      var appTimeHtml = '<div class="card mt12" style="background:#FFF8E4;border:2px solid #EFDDB8">' +
+        '<div class="sec-title">⏳ 使用时长管控</div>' +
+        '<div class="muted" style="font-size:12px;margin-bottom:8px">' +
+        '除了每日三项固定任务的「打卡计时」，其它板块（语文、数学、英语、奖励）合起来每天最多 ' + aQuota + ' 分钟。' +
+        '时间到了只锁这些板块，<b>首页打卡照常能用</b>。' +
+        '</div>' +
+        '<div class="muted" style="font-weight:800">今天已用 <b>' + aUsed + '</b> / ' + aQuota + ' 分钟' +
+        (aBonus ? '（含你加的 ' + aBonus + ' 分钟）' : '') + '</div>' +
+        '<div style="height:10px;border-radius:6px;background:#EADFC0;overflow:hidden;margin:8px 0">' +
+        '<div style="height:100%;width:' + (aQuota ? Math.min(100, Math.round(aUsed / aQuota * 100)) : 0) + '%;background:' +
+        (aUsed >= aQuota ? '#E24B4A' : '#5BA82B') + '"></div></div>' +
+        '<div class="row"><div class="row-main"><div class="row-t">时长限制</div>' +
+        '<div class="row-s">关掉就不限制（不建议）</div></div>' +
+        '<button class="pill-btn ' + (ac.enable ? 'pill-ok' : 'pill-gray') + '" style="min-height:44px" data-act="appToggle">' +
+        (ac.enable ? '已开启' : '已关闭') + '</button></div>' +
+        '<div style="display:flex;gap:8px;margin-top:8px">' +
+        '<button class="btn btn-ghost" style="flex:1;min-height:52px;font-size:14px" data-act="appSet" data-v="30">改成 30 分钟</button>' +
+        '<button class="btn btn-ghost" style="flex:1;min-height:52px;font-size:14px" data-act="appSet" data-v="20">改成 20 分钟</button>' +
+        '<button class="btn btn-lav" style="flex:1;min-height:52px;font-size:14px" data-act="appBonus">今天 +10 分钟</button>' +
+        '</div>' +
+        '</div>';
+
+      /* ===== ✂️ 精简模式（减少屏幕使用） ===== */
+      var ln4 = (typeof Kid !== 'undefined' && global.Kid && global.Kid.lean) ? global.Kid.lean() : { on: 0 };
+      var leanHtml = '<div class="card mt12" style="background:#F7FBFF;border:2px solid #C9E0F5">' +
+        '<div class="sec-title">✂️ 精简模式（少看屏幕）</div>' +
+        '<div class="muted" style="font-size:12px;margin-bottom:8px">' +
+        '关掉一部分在纸质书上做更合适的练习，只留真正需要在屏幕上做的。' +
+        '<b>随时可以打开，不会丢任何数据。</b>' +
+        '</div>' +
+        '<div class="row"><div class="row-main"><div class="row-t">精简模式</div>' +
+        '<div class="row-s">关掉后所有板块恢复</div></div>' +
+        '<button class="pill-btn ' + (ln4.on ? 'pill-ok' : 'pill-gray') + '" style="min-height:44px" data-act="leanToggle">' +
+        (ln4.on ? '已开启' : '已关闭') + '</button></div>' +
+        (ln4.on
+          ? '<div style="font-size:13px;font-weight:800;color:#185FA5;margin-top:8px;line-height:1.9">' +
+          '· 语文：去掉生字闯关、预习探险（字词类改在纸质书上做）<br>' +
+          '· 英语：去掉朗文阅读题<br>' +
+          '· 英语：复习题只出 6 道语法题<br>' +
+          '· 英语：听力按 L1、L2… 顺序播放，孩子在纸质卷子上做' +
+          '</div>'
+          : '') +
+        '</div>';
+
       var autoHtml = '<div class="card mt12">' +
         '<div class="sec-title">⚙️ 快捷开关</div>' +
         '<div class="row"><div class="row-main"><div class="row-t">提交自动通过</div>' +
@@ -371,7 +420,7 @@
         '<div class="sec-title" style="font-size:17px">👋 你好，' + U.esc(s.kidName) + '的妈妈</div>' +
         '<div class="muted">今天是周' + S.WEEK_CN[S.dayIndex(date)] + ' · ' + date + '</div>' +
         '<div class="mt12">' + boxes + '</div>' +
-        noteHtml + autoNoteHtml + moodHtml + warmHtml + wordHtml +
+        noteHtml + autoNoteHtml + moodHtml + warmHtml + wordHtml + appTimeHtml + leanHtml +
 
         '<div class="card mt12"><div class="sec-title">📋 今日固定任务</div>' + rows + '</div>' +
         '<div class="card mt12"><div class="sec-title">📅 本周长线任务（' + ws.slice(5) + ' ~ ' + we.slice(5) + '）</div>' + weeklyRows + '</div>' +
@@ -690,6 +739,40 @@
       var s = S.state;
 
       if (name === 'ptab') { Parent.page = v; return true; }
+
+      /* 精简模式 */
+      if (name === 'leanToggle') {
+        var L4 = global.Kid.lean();
+        L4.on = L4.on ? 0 : 1;
+        S.save();
+        U.toast(L4.on ? '精简模式已开启' : '已恢复全部板块');
+        return true;
+      }
+
+      /* 全局使用时长 */
+      if (name === 'appToggle') {
+        var ac0 = S.appConf();
+        ac0.enable = ac0.enable ? 0 : 1;
+        S.save();
+        U.toast(ac0.enable ? '时长限制已开启' : '时长限制已关闭（不限时）');
+        return true;
+      }
+      if (name === 'appSet') {
+        var ac1 = S.appConf();
+        ac1.baseMin = parseInt(v, 10) || 30;
+        S.save();
+        U.toast('每天改成 ' + ac1.baseMin + ' 分钟');
+        return true;
+      }
+      if (name === 'appBonus') {
+        var ac2 = S.appConf();
+        var d2 = S.dateStr();
+        if (!ac2.bonus) ac2.bonus = {};
+        ac2.bonus[d2] = (ac2.bonus[d2] || 0) + 10;
+        S.save();
+        U.toast('今天加了 10 分钟');
+        return true;
+      }
 
       /* ---------- 妈妈的悄悄话 ---------- */
       if (name === 'noteTpl') {
