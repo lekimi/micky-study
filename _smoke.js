@@ -620,6 +620,40 @@ ok('倒计时 · 未启动显示开始按钮', global.Kid.timerHtml('TEST', 10).
   S.save();
 })();
 
+/* ---- 屏幕常亮（平板倒计时期间不息屏） ---- */
+(function () {
+  const K = global.Kid;
+  ok('有 wakeSync / wakeRelease', typeof K.wakeSync === 'function' && typeof K.wakeRelease === 'function');
+  /* Node 里没有 navigator.wakeLock，必须优雅降级、不能抛错 */
+  let threw = false;
+  try { K.wakeSync(); K.wakeRelease(); } catch (e) { threw = true; }
+  ok('没有 wakeLock 的环境不报错', threw === false);
+  ok('没有计时在跑 → 不申请常亮', K.wakeBusy() === false);
+  /* 起一个 10 分钟倒计时 → busy 应为 true，且结束后回到 false */
+  K.timerStart('WAKETEST', 10);
+  ok('有倒计时在跑 → 需要常亮', K.wakeBusy() === true);
+  global.Store.state.timers[global.Kid.timerKey('WAKETEST')].end = Date.now() - 1000;
+  ok('倒计时走完 → 不再需要常亮', K.wakeBusy() === false);
+  delete global.Store.state.timers[global.Kid.timerKey('WAKETEST')];
+  /* 故事海 30 分钟也算 */
+  global.Store.state.readTimer = { date: S.dateStr(), book: '测试', start: Date.now(), end: Date.now() + 600000 };
+  ok('阅读计时在跑 → 也需要常亮', K.wakeBusy() === true);
+  global.Store.state.readTimer = null;
+  S.save();
+})();
+
+/* ---- 平板布局：960px 宽 + 字号微调 ---- */
+(function () {
+  const fs = require('fs'), path2 = require('path');
+  const css = fs.readFileSync(path2.join(__dirname, 'css', 'pvz.css'), 'utf8');
+  ok('CSS 有平板断点', css.indexOf('@media (min-width: 860px)') > 0);
+  ok('平板下内容列放宽到 960px', /@media \(min-width: 860px\)[\s\S]*?max-width: 960px/.test(css));
+  /* 字号只能微调：不允许出现 20px 以上的放大规则 */
+  const block = css.slice(css.indexOf('@media (min-width: 860px)'));
+  const sizes = (block.match(/font-size:\s*(\d+)px/g) || []).map(s => parseInt(s.replace(/\D/g, ''), 10));
+  ok('平板字号全部 ≤21px（没有放大成大字）', sizes.every(n => n <= 21), sizes.join(','));
+})();
+
 // ---- 计算小超市：提前完成按剩余分钟发水滴 ----
 (function () {
   /* 今天的固定任务前面已经全做完了，这里用另一个 slot（平日/周末）的计算任务来测，避免被判重复 */
