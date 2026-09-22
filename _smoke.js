@@ -285,6 +285,14 @@ ok('英语页含「本周任务」', he.indexOf('本周任务') > 0);
 ok('英语页含顺序听力播放器', he.indexOf('朗文听力') > 0 && he.indexOf('listenGo') > 0);
 ok('精简模式下英语页不含阅读题', he.indexOf('朗文阅读练习') < 0);
 global.Kid.page = 'chinese';
+/* 上面的评分测试可能已经留下「今天讲过了」的记录；
+   讲述入口（看图写话/语音/找话题）只在「还没讲」时给，先清成干净状态再验 */
+(function () {
+  const d = global.Store.dateStr();
+  global.Store.state.speech = (global.Store.state.speech || []).filter(x => x.date !== d);
+  global.Store.state.speechDraft = null;
+  global.Store.save();
+})();
 ok('语文页含讲述工坊', global.Kid.render().indexOf('今日讲述') > 0);
 /* 看图写话已合并进「今日讲述」：平时不单独占一块，入口在讲述里给 */
 ok('语文页含看图写话入口（合并后）', global.Kid.render().indexOf('看图写话') > 0);
@@ -343,6 +351,44 @@ ok('语文页含语文学习园入口', global.Kid.render().indexOf('语文学�
   ok('升格改写有改写结果', !!r.rewrite && r.rewrite.length > 0);
   ok('升格改写给出了改动理由', (r.changes || []).length > 0);
   ok('升格改写保留孩子自己的内容', r.rewrite.indexOf('小明') >= 0);
+  ok('升格改写会加关联词（顺序词）', r.rewrite.indexOf('接着') >= 0 || r.rewrite.indexOf('然后') >= 0 || r.rewrite.indexOf('最后') >= 0);
+  ok('升格改写标出了用到的方法', (r.methods || []).length > 0);
+  /* 顺序乱了要能梳理：结果句在中间 → 挪到结尾 */
+  const r2 = global.AI.localPolish('我最后回家了。早上我和小明去操场。我们踢球。');
+  ok('升格改写会梳理上下文（结果句挪到最后）',
+    r2.rewrite.indexOf('回家') > r2.rewrite.indexOf('操场'), r2.rewrite);
+  ok('升格改写不新增人物/情节', r2.rewrite.indexOf('老师') < 0 && r2.rewrite.indexOf('妈妈') < 0);
+})();
+/* 「今日讲述」与「再讲一件事」已合并：每天一篇，讲完是「接着补一补」 */
+(function () {
+  const S2 = global.Store, E2 = global.Engine, K2 = global.Kid;
+  const date = S2.dateStr();
+  ok('每天只讲一篇', E2.SPEECH_DAILY_MAX === 1);
+  ok('老师一轮最多问 4 句', global.SpeechCoach.MAX_ROUND === 4);
+  /* 清掉前面测试留下的讲述记录，从干净状态验 */
+  S2.state.speech = (S2.state.speech || []).filter(x => x.date !== date);
+  S2.state.speechDraft = null;
+  S2.save();
+  K2.page = 'chinese';
+  const empty = K2.render();
+  ok('没讲过时是「今日讲述」', empty.indexOf('今日讲述') >= 0);
+  /* 讲一篇 */
+  const res = global.SpeechCoach.scoreV2('今天下午在操场上，我和小明踢足球。突然小明摔了一跤，我连忙跑过去扶他。我心里很着急，后来老师来给他擦药。', '今天我和小明玩');
+  E2.finishSpeech2('今天下午在操场上，我和小明踢足球。突然小明摔了一跤，我连忙跑过去扶他。我心里很着急，后来老师来给他擦药。', '今天我和小明玩', res, date);
+  const doneHtml = K2.render();
+  ok('讲完后不再出现「再讲一件事」', doneHtml.indexOf('再讲一件事') < 0);
+  ok('讲完后给的是「接着补一补」', doneHtml.indexOf('接着补一补') >= 0);
+  ok('讲完一篇后不能开新篇', E2.speechCanSubmit(date) === false);
+  ok('但可以把同一篇接着补', E2.speechCanRework(date) === true);
+  /* 补一次：不新增记录、分数取更高 */
+  const res2 = global.SpeechCoach.scoreV2('今天下午在操场上，我和小明一起踢足球。突然小明摔了一跤，我连忙跑过去把他扶起来，他的膝盖破了皮，我心里很着急，像热锅上的蚂蚁。后来老师来了，给他擦了药。我觉得帮助别人是一件开心的事。', '今天我和小明玩');
+  const before = E2.speechCountToday(date);
+  const fin = E2.finishSpeech2('今天下午在操场上，我和小明一起踢足球。突然小明摔了一跤，我连忙跑过去把他扶起来，他的膝盖破了皮，我心里很着急，像热锅上的蚂蚁。后来老师来了，给他擦了药。我觉得帮助别人是一件开心的事。', '今天我和小明玩', res2, date, { cont: true });
+  ok('补写不新增记录（还是同一篇）', E2.speechCountToday(date) === before);
+  ok('补写后记了补写次数', (fin.rec.reworks || 0) === 1);
+  ok('补写后完成页显示补过几次', K2.render().indexOf('补了 1 次') >= 0);
+  /* 旧的改写作废，要重新生成 */
+  ok('补写后旧改写作废', fin.rec.rewrite === '');
 })();
 /* 单独验「每日固定任务按顺序做」：一项通过才解锁下一项；
    计算小超市在「等妈妈确认」期间，下一项也能先开始计时（其它板块不再被锁） */
