@@ -259,22 +259,19 @@
 
       var noteHtml = '<div class="card mt12" style="background:#FFF6F9;border:2px solid #F0C7D4">' +
         '<div class="sec-title">✉️ 给 Micky 留一句悄悄话</div>' +
-        '<div class="muted" style="font-size:12px;margin-bottom:8px">' +
-        '他会看到一个信封，点开才能读。读完这里会显示「他读过了」。' +
-        '</div>' +
+        '<div class="muted" style="font-size:12px;margin-bottom:8px">他会看到信封，点开才读。读完这里显示「他读过了」。</div>' +
         '<input class="field" id="note-text" placeholder="写一句你想跟他说的话…" style="text-align:left">' +
         '<div style="display:flex;gap:8px;margin-top:8px">' +
         '<button class="btn btn-ghost" style="flex:1;min-height:52px;font-size:14px" data-act="noteSend" data-v="today">今天生效</button>' +
         '<button class="btn btn-ghost" style="flex:1;min-height:52px;font-size:14px" data-act="noteSend" data-v="tomorrow">明天生效</button>' +
         '<button class="btn btn-lav" style="flex:1;min-height:52px;font-size:14px" data-act="noteSend" data-v="now">现在就给他</button>' +
         '</div>' +
-        '<div style="margin-top:10px">' +
+        '<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:900;color:#7A6248;font-size:13px">📜 现成话术 / 历史小纸条（点开看）</summary>' +
+        '<div style="margin-top:8px">' +
         '<div style="font-size:12px;font-weight:900;color:#7A6248;margin-bottom:4px">懒得想？点一句现成的</div>' +
         tplHtml +
-        '</div>' +
-        '<div class="muted" style="font-size:12px;margin-top:8px">' +
-        '点模板会把它填进上面的输入框，你可以改完再发。' +
-        '</div>' +
+        (noteRows ? '<div class="sec-title" style="font-size:14px;margin-top:12px">📬 历史小纸条</div>' + noteRows : '') +
+        '</div></details>' +
         '</div>';
 
       /* 今天自动生成的那句（按他的心情来的，不用你写） */
@@ -419,13 +416,50 @@
         '<div class="row-s">关闭时用本地评分（零成本、离线可用）</div></div>' +
         '<button class="pill-btn ' + (s.ai && s.ai.enabled ? 'pill-ok' : 'pill-gray') + '" data-act="toggleAI">' +
         ((s.ai && s.ai.enabled) ? '已开启' : '已关闭') + '</button></div>' +
+        '<div class="row"><div class="row-main"><div class="row-t">⏰ 倒计时语音提醒</div>' +
+        '<div class="row-s">练字 / 计算快到时，语音 + 音乐提醒他</div></div>' +
+        '<button class="pill-btn ' + (s.sound && s.sound.on ? 'pill-ok' : 'pill-gray') + '" data-act="voiceToggle">' +
+        ((s.sound && s.sound.on) ? '已开启' : '已关闭') + '</button></div>' +
         '<button class="btn btn-lav mt8" data-act="aiConfig">配置 AI 老师参数</button>' +
+        '</div>';
+
+      /* ===== 妈妈表扬教练：今日怎么夸 + 本周成长周报 ===== */
+      var aiOn = (global.Coach && global.Coach.aiOn) ? global.Coach.aiOn() : false;
+      var cachedP = (s.coach && s.coach.praise && s.coach.praise[date]) || null;
+      var coach = cachedP || (global.Coach ? global.Coach.today(date) : { lines: [], tip: '' });
+      if (!cachedP && global.Coach) global.Coach.refreshToday(date);
+      var wsK = S.weekStartOf(date);
+      var cachedW = (s.coach && s.coach.week && s.coach.week[wsK]) || null;
+      var wk = cachedW || (global.Coach ? global.Coach.weekly(date) : null);
+      if (!cachedW && global.Coach) global.Coach.refreshWeek(date);
+
+      var coachLines = (coach.lines || []).map(function (t) {
+        return '<div style="background:#FFFDF5;border:1px solid #F0E2B8;border-radius:12px;padding:10px 12px;margin-bottom:8px;line-height:1.7;font-weight:700;color:#5C4A1E">💛 ' + U.esc(t) + '</div>';
+      }).join('');
+      var coachHtml = '<div class="card mt12" style="background:#FFFBEF;border:2px solid #F2D98A">' +
+        '<div class="sec-title">💛 今日怎么夸他（AI 教练）</div>' +
+        '<div class="muted" style="font-size:12px;margin-bottom:8px">根据他今天真实完成的事，给你能直接说出口的话——夸努力、夸具体行为，不夸聪明。' +
+        (aiOn ? '' : '（没开 AI 时用本地模板，填了 Key 会更贴你的口气）') + '</div>' +
+        (coachLines || '<div class="muted">今天还没打卡，先陪他把第一项点开～</div>') +
+        (coach.tip ? '<div class="muted" style="font-size:12px;margin-top:6px">📌 ' + U.esc(coach.tip) + '</div>' : '') +
+        '</div>';
+
+      var weekTalk = (wk && wk.talk ? wk.talk : []).map(function (t) {
+        return '<div style="background:#F6F1FF;border:1px solid #D9C7F2;border-radius:12px;padding:10px 12px;margin-bottom:8px;line-height:1.7">💬 ' + U.esc(t) + '</div>';
+      }).join('');
+      var weekHtml = '<div class="card mt12" style="background:#F8F4FF;border:2px solid #D9C7F2">' +
+        '<div class="sec-title">📈 本周成长周报（每周自动看一次）</div>' +
+        (wk ? '<div style="font-weight:800;color:#4A3A6B;line-height:1.7;margin-bottom:8px">' + U.esc(wk.rational) + '</div>' +
+          '<div style="background:#fff;border-radius:12px;padding:10px 12px;line-height:1.8;color:#5A4A78;margin-bottom:8px">' + U.esc(wk.grow) + '</div>' +
+          '<div class="sec-title" style="font-size:14px">今晚怎么跟他聊</div>' + weekTalk
+          : '<div class="muted">正在生成…</div>') +
         '</div>';
 
       return '<div style="padding:14px 14px 0">' +
         '<div class="sec-title" style="font-size:17px">👋 你好，' + U.esc(s.kidName) + '的妈妈</div>' +
         '<div class="muted">今天是周' + S.WEEK_CN[S.dayIndex(date)] + ' · ' + date + '</div>' +
         '<div class="mt12">' + boxes + '</div>' +
+        coachHtml + weekHtml +
         noteHtml + autoNoteHtml + moodHtml + warmHtml + wordHtml + appTimeHtml + leanHtml +
 
         '<div class="card mt12"><div class="sec-title">📋 今日固定任务</div>' + rows + '</div>' +
@@ -877,6 +911,14 @@
         s.ai.enabled = !s.ai.enabled;
         S.save();
         U.toast(s.ai.enabled ? 'AI 老师已开启' : '已切回本地评分');
+        return true;
+      }
+
+      if (name === 'voiceToggle') {
+        if (!s.sound) s.sound = { on: 1 };
+        s.sound.on = s.sound.on ? 0 : 1;
+        S.save();
+        U.toast(s.sound.on ? '倒计时语音提醒已开' : '倒计时语音提醒已关');
         return true;
       }
 
