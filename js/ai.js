@@ -226,35 +226,91 @@
   /* ---------------- 本地「升格改写」----------------
      用孩子自己写的内容，补上他缺的要素，做出一个更高分的示范版本。
      原则：事情、人物、经过全是他自己的，只改表达、不替他编内容。 */
+  /* 五感法的五个口子：改写法宝之一 */
+  var SENSE_WORDS = {
+    see: ['看到', '看见', '望', '瞧', '颜色', '红', '绿', '白', '亮', '闪', '圆', '样子', '像'],
+    hear: ['听到', '听见', '说', '喊', '叫', '哭', '笑', '吵', '响', '声', '安静'],
+    smell: ['闻', '香', '臭', '味道', '气味'],
+    taste: ['尝', '甜', '酸', '苦', '辣', '好吃', '渴'],
+    touch: ['摸', '碰', '软', '硬', '热', '冷', '凉', '烫', '滑', '粗糙']
+  };
+  var SENSE_NAME = { see: '看到的', hear: '听到的', smell: '闻到的', taste: '尝到的', touch: '摸到的' };
+  /* 表示「说完/结果」的句子，排顺序时要放到最后 */
+  var END_MARK = ['最后', '终于', '结果', '结束', '回家', '回到家', '后来'];
+  var SEQ_LINK = ['接着', '然后', '后来', '最后'];
+
   function localPolish(text) {
     var t = String(text || '').replace(/\s+/g, '').trim();
-    if (!t) return { rewrite: '', changes: [], mode: 'local' };
-    var changes = [];
-    var sents = t.match(/[^。！？]+[。！？]?/g) || [t];
+    if (!t) return { rewrite: '', changes: [], methods: [], mode: 'local' };
+    var changes = [], methods = [];
+    var sents = (t.match(/[^。！？]+[。！？]?/g) || [t]).filter(function (x) { return String(x).trim(); });
+    if (!sents.length) sents = [t];
 
-    /* 1) 时间 / 地点 */
+    /* ① 梳理上下文：如果说结果的句子跑到了中间，把它挪到末尾 */
+    if (sents.length > 2) {
+      var mi = -1;
+      for (var i = 0; i < sents.length - 1; i++) {
+        var isEnd = false;
+        END_MARK.forEach(function (w) { if (sents[i].indexOf(w) >= 0) isEnd = true; });
+        if (isEnd) { mi = i; break; }
+      }
+      if (mi >= 0) {
+        var mv = sents.splice(mi, 1)[0];
+        sents.push(mv);
+        changes.push('把说结果的那一句挪到了最后——先讲经过、再讲结果，读起来就顺了（梳理上下文）');
+        methods.push('顺序梳理：把结果句挪到结尾');
+      }
+    }
+
+    /* ② 时间 / 地点 */
     if (!has(t, TIME_WORDS) && !has(t, PLACE_WORDS)) {
       sents[0] = '今天，' + sents[0];
       changes.push('开头补了「今天」——读者马上知道是什么时候的事（补上「时间」要素）');
     }
-    /* 2) 先后顺序 */
+
+    /* ③ 关联词：把散着的句子连成一段（先…接着…然后…最后） */
     if (countHits(sents.join(''), SEQ_WORDS).n < 1 && sents.length > 1) {
-      sents[1] = '然后，' + sents[1];
-      changes.push('第二句前加了「然后」——事情的先后就清楚了（补上「顺序」要素）');
+      for (var k = 1; k < sents.length; k++) {
+        var link = k === sents.length - 1 ? '最后' : SEQ_LINK[(k - 1) % 3];
+        sents[k] = link + '，' + sents[k].replace(/^[，、]/, '');
+      }
+      changes.push('给每句话加了「接着 / 然后 / 最后」——句子之间有了先后，不再是一句一句地摆着（加关联词）');
+      methods.push('关联词：先…接着…然后…最后');
     }
+
     var out = sents.join('');
-    /* 3) 心情感受 */
+
+    /* ④ 五感法：缺哪一感，补一个「半成品」描写（不替他编情节，只补他能看到/听到的那一处） */
+    var missS = [];
+    Object.keys(SENSE_WORDS).forEach(function (k2) { if (!has(out, SENSE_WORDS[k2])) missS.push(k2); });
+    if (missS.length >= 4) {
+      out = out.replace(/[。！？]?$/, '') + '。直到现在，那天的样子和声音我还记得清清楚楚。';
+      changes.push('结尾补了一句「看到的 + 听到的」——这就是五感法，读的人像自己也到了现场');
+      methods.push('五感法·看到的/听到的：补了一句画面和声音');
+    } else if (missS.length) {
+      changes.push('还可以再补一处「' + missS.slice(0, 2).map(function (x) { return SENSE_NAME[x]; }).join('、') +
+        '」——比如它是什么颜色、发出什么声音（五感法里还没用到的）');
+    }
+
+    /* ⑤ 心情感受 */
     if (countHits(out, FEEL_WORDS).n < 1) {
       out = out.replace(/[。！？]?$/, '') + '。我心里觉得暖暖的，一直到回家都还记得。';
       changes.push('结尾加了一句心里感受——文章有了温度（补上「感受」要素）');
     }
-    /* 4) 把平淡的词换成更生动的说法 */
+
+    /* ⑥ 把平淡的词换成更生动的说法 */
+    var before = out;
     out = out.replace(/很高兴/g, '心里乐开了花')
       .replace(/很开心/g, '心里乐开了花')
       .replace(/很快地?跑/g, '飞快地跑')
-      .replace(/很好看/g, '漂亮极了');
+      .replace(/很好看/g, '漂亮极了')
+      .replace(/很多/g, '好多好多');
+    if (out !== before) {
+      changes.push('把「很高兴 / 很好看」这类大白话换成了更有画面的说法（好词好句）');
+      methods.push('好词好句：平淡词换成有画面的说法');
+    }
 
-    return { rewrite: out, changes: changes, mode: 'local' };
+    return { rewrite: out, changes: changes, methods: methods, mode: 'local' };
   }
 
   var AI = {
@@ -275,11 +331,21 @@
     polish: function (text, cfg) {
       cfg = cfg || {};
       if (!(cfg.enabled && cfg.apiKey)) return Promise.resolve(localPolish(text));
-      var SYS = '你是小学语文老师，正在帮二年级男孩 Micky 修改他自己的一段小短文。\n' +
-        '铁律：事情、人物、经过必须完全是他原文里的内容，**不许编造新情节**，只改表达方式。\n' +
-        '改法：补上缺的时间/地点、用上「先…然后…最后」这类顺序词、加一两句好词好句、' +
-        '结尾补一句真实的心理感受。改完要比原文更通顺更生动，但仍然像二年级孩子写的话（不要写成大人腔）。\n' +
-        '严格输出 JSON：{"rewrite":"改后的完整短文","changes":["改动1（说明为什么这样改更好）","改动2"]}，不要多余文字。';
+      var SYS = '你是小学语文老师，正在帮二年级男孩 Micky 修改他自己写的一段小短文。\n' +
+        '总目标：把他本来想说的意思说得更完整、更通顺、更生动。\n\n' +
+        '你可以做这些（按顺序来）：\n' +
+        '1【梳理上下文】他写的句子顺序如果乱了（比如先说结果、后说开头），调整语句顺序，让事情按「先→接着→然后→最后」走。\n' +
+        '2【加关联词】用「因为…所以…」「虽然…但是…」「一…就…」「先…接着…最后…」把散着的句子连成一段通顺的话。\n' +
+        '3【补细节——只能在他自己说的基础上合理延伸】：\n' +
+        '   · 五感法：他缺的那一两处补上——看到的（颜色、形状、样子）、听到的（什么声音、谁说了什么）、闻到的、尝到的、摸到的（软硬冷热）；\n' +
+        '   · 好词好句：把「很高兴 / 很快 / 很好看」这类平淡词换成更有画面的说法，可以打比方；\n' +
+        '   · 动作与对话：他提到的人和他当时在做什么、说了什么，补清楚。\n' +
+        '4【收尾】补一句真实的心理感受。\n\n' +
+        '铁律：不许编造新的情节、新的人物、新的结局；不许把他没做的事写成做了；' +
+        '可以在他表述的基础上填充一点点相关的描写，但意思必须是他自己的。\n' +
+        '改完仍然要像二年级孩子写的话（不要大人腔），长度控制在原文的 1.3～1.8 倍。\n' +
+        '严格输出 JSON：{"rewrite":"改后的完整短文","changes":["改动1（说明为什么这样改更好）","改动2"],' +
+        '"methods":["顺序梳理：把结果句挪到结尾","五感法·听到的：补了一句……","关联词：先…接着…最后"]}，不要多余文字。';
       var base = (cfg.baseUrl || 'https://api.deepseek.com/v1').replace(/\/+$/, '');
       return fetch(base + '/chat/completions', {
         method: 'POST',
@@ -299,7 +365,12 @@
           if (!m) throw new Error('返回格式异常');
           var o = JSON.parse(m[0]);
           if (!o.rewrite) throw new Error('没有改写结果');
-          return { rewrite: String(o.rewrite), changes: Array.isArray(o.changes) ? o.changes : [], mode: 'llm' };
+          return {
+            rewrite: String(o.rewrite),
+            changes: Array.isArray(o.changes) ? o.changes : [],
+            methods: Array.isArray(o.methods) ? o.methods : [],
+            mode: 'llm'
+          };
         })['catch'](function () { return localPolish(text); });
     },
 
