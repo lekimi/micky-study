@@ -223,7 +223,8 @@
       version: 1,
       kidName: 'Micky',
       pin: '1234',
-      autoApprove: false,        // 妈妈端可开：提交即通过
+      autoApprove: true,         // 妈妈端可改：提交即通过（默认开，孩子不被卡住）
+      autoApproveSet: 0,         // 妈妈亲手拨过这个开关才置 1，之后不再被默认值覆盖
       sun: 20,                   // 开局送一点，先有成就感
       water: 0,
       zombieStep: 0,
@@ -309,6 +310,9 @@
       }
       // 迁移：固定任务换新名字（练字 / 计算小超市 / 四面八方）
       if (migrateFixedTasks(s)) this.save();
+      /* 迁移：默认「提交自动通过」= 开（妈妈不在旁边时孩子不会被卡住）。
+         只要妈妈没亲手拨过这个开关，就一直是开；她拨过一次就尊重她的选择。 */
+      if (s.autoApproveSet !== 1) s.autoApprove = true;
       // 听写进度（每次 10 个词，打散跨单元）
       if (typeof s.dictRound !== 'number') s.dictRound = 0;
       this.state = s;
