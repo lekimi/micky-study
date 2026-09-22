@@ -121,8 +121,11 @@
     var SC = global.SpeechCoach;
     var inWrite = !!(d && d.mode === 'pic');
 
-    /* ① 选图 */
+    /* ① 选图
+       ⚠️ 看图写话已经合并进「今日讲述」：不再是独立板块，
+       只有孩子点「给我一幅图」（Kid.picOpen）时才出现选图列表。 */
     if (!inWrite) {
+      if (!(global.Kid && global.Kid.picOpen)) return '';
       var listHtml = SCENES.map(function (x) {
         var on = (x.id === sc.id);
         return '<button class="btn ' + (on ? 'btn-green' : 'btn-ghost') + '" style="width:100%;min-height:56px;text-align:left;padding:10px 12px;margin-bottom:8px" ' +
@@ -137,7 +140,9 @@
         '<div class="muted" style="font-size:13px;line-height:1.8;margin-bottom:8px">' +
         '挑一幅画面，老师会一句句问你，帮你把它写成一小段。' +
         '<b>练的就是作文的基本功</b>：有谁、在干什么、后来怎么了、心里怎么想。' +
-        '</div>' + listHtml + '</div>';
+        '</div>' + listHtml +
+        '<button class="btn btn-ghost mt8" data-act="picBack" style="font-size:14px">← 我自己有话说，回去自己讲</button>' +
+        '</div>';
     }
 
     /* ② 正在写 */
@@ -229,6 +234,9 @@
         Kid.spAsk = null;
         return true;
       }
+      /* 合并进「今日讲述」后的开关动作（kid.js 会把 pic 开头的动作转发到这里） */
+      if (name === 'picOpen') { Kid.picOpen = 1; return true; }
+      if (name === 'picBack') { Kid.picOpen = 0; return true; }
       return false;
     }
   };
