@@ -113,7 +113,13 @@
       if (!isTimed) return Kid.act('submit', id);
 
       var tm = Kid.timerOf(id);
-      if (!tm) return Kid.act('timerStart', id + ':' + t.limit);
+      if (!tm) {
+        if (t.kind === 'fixed' && !Kid.fixedUnlocked(id, date)) {
+          U.toast('先把上一项做完并通过，才能开始这项哦 🔒');
+          return false;
+        }
+        return Kid.act('timerStart', id + ':' + t.limit);
+      }
       if (Date.now() >= tm.end) return Kid.act('submit', id);
       if (t.early) return Kid.act('calcDone', id);
 
@@ -141,6 +147,9 @@
       var tm = isTimed ? Kid.timerOf(t.id) : null;
       var ended = !!(isTimed && tm && Date.now() >= tm.end);
       var earlyMin = (isTimed && t.early && tm && !ended) ? Kid.earlyMinutes(t.id) : 0;
+      /* 按顺序模式：上一项还没通过 → 这项锁定（计算小超市在等妈妈时除外） */
+      var locked = (t.kind === 'fixed' && isTimed && status === 'todo')
+        ? !Kid.fixedUnlocked(t.id, date) : false;
 
       var cls = status === 'done' ? ' done' : (status === 'waiting' ? ' waiting' : '');
       var right = '';
@@ -154,8 +163,10 @@
       } else if (!isTimed) {
         right = '<button class="btn btn-green" style="width:auto;min-height:52px;font-size:15px;padding:10px 18px" data-act="submit" data-v="' + t.id + '">我做完啦</button>';
       } else if (!tm) {
-        right = '<button class="btn btn-green" style="width:auto;min-height:56px;font-size:16px;padding:10px 20px" data-act="timerStart" data-v="' +
-          t.id + ':' + t.limit + '">⏱ 开始计时</button>';
+        right = locked
+          ? '<button class="btn btn-ghost" disabled style="width:auto;min-height:56px;font-size:15px;padding:10px 20px;opacity:.6">🔒 先做上一项</button>'
+          : '<button class="btn btn-green" style="width:auto;min-height:56px;font-size:16px;padding:10px 20px" data-act="timerStart" data-v="' +
+            t.id + ':' + t.limit + '">⏱ 开始计时</button>';
       } else if (ended) {
         right = '<button class="btn btn-green" style="width:auto;min-height:56px;font-size:15px;padding:10px 18px" data-act="submit" data-v="' +
           t.id + '">✅ 时间到啦，打卡</button>';
@@ -197,6 +208,9 @@
         subLine = '<div class="muted" style="margin-top:3px;font-weight:700">本周内完成（周五前）</div>';
       }
       /* 固定任务：倒计时条 + 提示 */
+      if (locked) {
+        subLine += '<div class="muted" style="margin-top:4px;font-weight:800;color:#B06A2A">🔒 先把上一项打卡通过，才能开始这项计时</div>';
+      }
       if (isTimed && status !== 'done') {
         if (tm) {
           subLine += '<div style="margin-top:8px">' + Kid.bigTimer(t.id) + '</div>';
@@ -440,6 +454,24 @@
         '<div style="padding:12px 14px 0">' + Kid.plantCard() + Kid.movieCard() + '</div>';
     },
 
+    /* 阅读 30 分钟倒计时（存在本地，跨刷新不丢） */
+    READ_MIN: 30,
+    readTimerOf: function () {
+      var s = S.state;
+      if (!s.readTimer || s.readTimer.date !== S.dateStr()) return null;
+      return s.readTimer;
+    },
+    readStartReading: function (book) {
+      var s = S.state;
+      s.readTimer = {
+        date: S.dateStr(), book: String(book || '').trim(),
+        start: Date.now(), end: Date.now() + Kid.READ_MIN * 60000
+      };
+      S.save();
+      return s.readTimer;
+    },
+    readClearTimer: function () { S.state.readTimer = null; S.save(); },
+
     /* ---------------- 讲述工坊（语文）· AI 引导式扩写 ---------------- */
 
     /* 已完成的成绩单 */
@@ -508,6 +540,19 @@
           '👩‍🏫 老师想问你（第 ' + cur.round + ' 轮 · ' + cur.icon + ' ' + U.esc(cur.label) + '）</div>' +
           '<div style="font-size:17px;font-weight:900;color:#0C447C;line-height:1.6">' + U.esc(cur.ask) + '</div>' +
           '</div>' +
+          /* 方向选项：孩子常常「不知道说什么」，给他几个方向点一下，
+             比让他凭空想容易十倍 —— 点完还能自己改。 */
+          (cur.choices && cur.choices.length
+            ? '<div style="margin-top:10px">' +
+            '<div style="font-size:12px;font-weight:900;color:#7A6248;margin-bottom:6px">' +
+            '想不出来？点一个试试，再把它说完整：</div>' +
+            '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+            cur.choices.map(function (c) {
+              return '<button class="pill-btn" style="min-height:52px;font-size:13px;padding:8px 12px" ' +
+                'data-act="spChoice" data-v="' + U.esc(c) + '">' + U.esc(c) + '</button>';
+            }).join('') +
+            '</div></div>'
+            : '') +
           '<textarea class="field mt8" id="sp-ans" rows="3" placeholder="把你想到的话写在这里…" style="min-height:96px;line-height:1.8"></textarea>' +
           '<div style="display:flex;gap:8px;margin-top:8px">' +
           '<button class="btn btn-green" style="flex:1;min-height:52px" data-act="spAnswer">说好了，加上去</button>' +
@@ -1708,22 +1753,51 @@
         '<div class="muted" style="margin-top:6px">明天再来 ~</div></div>'
         : '';
 
-      var readTimerPlaceholder = '';
-      var pickHtml = Kid.READ_BOOKS.map(function (g) {
-        return '<div style="margin-top:12px"><div style="font-weight:900;color:#5C4322;font-size:15px">' +
-          g.emoji + ' ' + U.esc(g.g) + '</div>' +
-          '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">' +
-          g.list.map(function (b) {
-            var on = Kid.readPick === b;
-            return '<button class="pill-btn ' + (on ? 'pill-ok' : 'pill-gray') + '" data-act="readPick" data-v="' + U.esc(b) + '">' + U.esc(b) + '</button>';
-          }).join('') + '</div></div>';
-      }).join('');
+      /* 改成：自己填书名 → 30 分钟倒计时 → 到点才能提交 → 妈妈确认才给水滴 */
+      var pickHtml = '';
+      var tm = Kid.readTimerOf();
+      var pending = (s.readLog || []).filter(function (r) {
+        return r.date === today && r.status === 'submitted';
+      })[0];
 
-      var checkBtn = done.length
-        ? '<div class="muted mt12">今天的水滴已经收到啦，读过的书记在下面的漂流日记里 🐚</div>'
-        : '<button class="btn btn-green mt12" data-act="readCheck">🐚 我读完啦，打卡 +💧10</button>' +
-        '<div class="muted" style="margin-top:6px">' +
-        (Kid.readPick ? '今天漂的是《' + U.esc(Kid.readPick) + '》' : '也可以自己挑一本书，直接打卡') + '</div>';
+      var timerHtml = '';
+      if (tm) {
+        var left = Math.max(0, Math.ceil((tm.end - Date.now()) / 1000));
+        var mm = Math.floor(left / 60), ss = left % 60;
+        if (left <= 0) {
+          timerHtml = '<div style="background:#E9F7E9;border:2px solid #B7DFB7;border-radius:14px;padding:12px;margin:12px 0">' +
+            '<b style="color:#2F6B3A">⏰ 30 分钟读满啦！</b><br>' +
+            '<span class="muted">把书名填好，交给妈妈确认就能拿到水滴。</span></div>';
+        } else {
+          timerHtml = '<div style="background:#EAF3FB;border:2px solid #B5D4F4;border-radius:14px;padding:12px;margin:12px 0;text-align:center">' +
+            '<div style="font-size:12px;font-weight:900;color:#185FA5">正在读《' + U.esc(tm.book || '（没填书名）') + '》</div>' +
+            '<div style="font-size:40px;font-weight:900;color:#0C447C;line-height:1.2" class="timer-tick" data-timer="read">' +
+            mm + ':' + (ss < 10 ? '0' : '') + ss + '</div>' +
+            '<div class="muted" style="font-size:12px">读完 30 分钟才能打卡哦，坚持住 💪</div>' +
+            '</div>';
+        }
+      }
+
+      var checkBtn;
+      if (done.length) {
+        checkBtn = '<div class="muted mt12">今天的水滴已经收到啦，读过的书记在下面的漂流日记里 🐚</div>';
+      } else if (pending) {
+        checkBtn = '<div style="background:#FFF6F2;border:2px solid #F0C7AE;border-radius:14px;padding:12px;margin-top:12px">' +
+          '<b style="color:#A8435B">⏳ 已经交给妈妈啦，等她确认</b><br>' +
+          '<span class="muted">《' + U.esc(pending.book || '') + '》· 妈妈通过后水滴才到账。</span></div>';
+      } else {
+        checkBtn = '<div style="margin-top:12px">' +
+          '<input class="field" id="read-book" placeholder="今天读的是哪本书？自己填" value="' + U.esc(Kid.readPick || '') + '" style="text-align:left">' +
+          '</div>' +
+          (tm
+            ? '<button class="btn btn-green mt8" data-act="readCheck">✅ 读满 30 分钟，交给妈妈</button>'
+            : '<button class="btn btn-green mt8" data-act="readStart">⏱ 开始读 30 分钟</button>') +
+          '<div class="muted" style="margin-top:6px;font-size:12px">' +
+          '要读满 30 分钟才能打卡，而且<b>妈妈确认了才算数</b>——这样才是真的读完啦。' +
+          '</div>';
+      }
+
+      var readTimerPlaceholder = timerHtml;
 
       /* 漂流日记 */
       var log = (s.readLog || []).slice(-14).reverse();
@@ -2635,6 +2709,9 @@
         '<div class="sec-title" style="font-size:16px">✅ 今日任务</div>' + todayHtml + '</div>';
 
       if (subj === 'chinese') {
+        if (global.PicWrite) {
+          html += '<div style="padding:12px 14px 0">' + global.PicWrite.panel() + '</div>';
+        }
         html += '<div style="padding:12px 14px 0">' + Kid.speechPanel(date) + '</div>';
         html += '<div style="padding:12px 14px 0">' + Kid.phrasePanel() + '</div>';
         html += '<div style="padding:12px 14px 0">' + Kid.cnPanel() + '</div>';
@@ -2790,6 +2867,56 @@
     },
 
     /* ---------------- 渲染入口 ---------------- */
+    /* 今天的固定任务是不是都做完了 */
+    fixedAllDone: function () {
+      try { return E.todayFixedStatus(S.dateStr()).all; } catch (e) { return true; }
+    },
+
+    /* 每日固定任务要不要「按顺序做」（妈妈端「先做完正事」开关）
+       关掉 → 三项同时开放；开 → 第 K+1 项要等第 K 项妈妈通过后才解锁。
+       例外：计算小超市（带 early 标志）在「等妈妈确认」期间，下一项就能先开始计时。 */
+    fixedUnlocked: function (taskId, date) {
+      var ln = Kid.lean();
+      if (!(ln.on && ln.afterTasks)) return true;     // 没开「按顺序」就全部放开
+      var list = S.fixedTasksOf(date);                // 已按 order 排好序
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].id !== taskId) continue;
+        if (i === 0) return true;                     // 第一项永远开放
+        var prev = list[i - 1];
+        var sub = S.subOf(prev.id, date);
+        if (sub && sub.status === 'approved') return true;
+        if (sub && sub.status === 'submitted' && prev.early) return true; // 计算在等妈妈，下一项可先开始
+        return false;
+      }
+      return true;
+    },
+
+    /* 「先做完正事」提示页：针对「任务之间到处晃荡」 */
+    firstThingsHtml: function () {
+      var stat = E.todayFixedStatus(S.dateStr());
+      var left = stat.list.filter(function (t) {
+        var sub = S.subOf(t.id, S.dateStr());
+        return !(sub && sub.status === 'approved');
+      });
+      var rows = left.map(function (t) {
+        return '<div class="task-card"><div class="task-emoji">' + t.emoji + '</div>' +
+          '<div style="flex:1;min-width:0"><div class="task-title">' + U.esc(t.title) + '</div>' +
+          '<div><span class="task-tag">还没完成</span></div></div></div>';
+      }).join('');
+
+      return '<div class="card mt12" style="background:#FFF8E4;border:2px solid #EFDDB8">' +
+        '<div class="sec-title">🚦 先把正事做完</div>' +
+        '<div class="muted" style="line-height:1.9;margin-top:4px">' +
+        '今天的固定任务还剩 <b>' + left.length + '</b> 项。做完这些，' +
+        '其它板块就都开放啦 —— <b>先苦后甜，玩起来也更安心</b>。' +
+        '</div>' +
+        '<div style="margin-top:10px">' + rows + '</div>' +
+        '<button class="btn btn-green mt12" data-act="tab" data-v="home">🏡 回首页，先把这些做完</button>' +
+        '<div class="muted" style="font-size:12px;margin-top:8px">' +
+        '（妈妈端可以关掉这个限制。）' +
+        '</div></div>';
+    },
+
     /* 使用时间到了 → 除了首页（要打卡）和奖励页，其它板块都锁上 */
     appLockHtml: function () {
       var left = S.appLeftSec();
@@ -2811,6 +2938,7 @@
     render: function () {
       var html = '';
       var lock = S.appTimeUp() && Kid.page !== 'home' && Kid.page !== 'reward';
+
       if (lock) {
         html = Kid.appLockHtml();
       } else if (Kid.page === 'home') html = Kid.pageHome();
@@ -2950,6 +3078,11 @@
       /* 数学趣味闯关的动作（mth 开头）交给 js/math.js 处理 */
       if (name.indexOf('mth') === 0 && global.MathGame) {
         return global.MathGame.act(name, v);
+      }
+
+      /* 看图写话（pic 开头）交给 js/picwrite.js 处理 */
+      if (name.indexOf('pic') === 0 && global.PicWrite) {
+        return global.PicWrite.act(name, v);
       }
 
       /* 英语查词 / 单词本 / 错题本（wb 开头）交给 js/wordbook.js 处理 */
@@ -3106,6 +3239,16 @@
           else U.toast('各个方面都补到了，可以收尾啦');
         });
         return true;
+      }
+
+      /* 点了方向选项 → 填进输入框当开头，孩子可以接着改 */
+      if (name === 'spChoice') {
+        var ec = document.getElementById('sp-ans');
+        if (ec) {
+          ec.value = String(v || '');
+          try { ec.focus(); } catch (e2) { }
+        }
+        return false;
       }
 
       if (name === 'spSkip') {
@@ -3403,6 +3546,10 @@
       if (name === 'timerStart') {
         var tp = String(v).split(':');
         var tid = tp[0], tmin = parseInt(tp[1], 10) || 10;
+        if (t.kind === 'fixed' && !Kid.fixedUnlocked(tid, S.dateStr())) {
+          U.toast('先把上一项做完并通过，才能开始这项哦 🔒');
+          return false;
+        }
         Kid.timerStart(tid, tmin);
         App.render();
         U.toast('开始计时：' + tmin + ' 分钟');
@@ -3413,18 +3560,41 @@
         App.render();
         return false;
       }
+      /* 阅读：30 分钟倒计时 → 到点才能「交给妈妈」→ 妈妈确认后才发水滴 */
+      if (name === 'readStart') {
+        var bi = document.getElementById('read-book');
+        var bk = bi ? String(bi.value || '').trim() : '';
+        if (!bk) { U.toast('先写上今天读的是哪本书'); return false; }
+        Kid.readStartReading(bk);
+        Kid.readPick = bk;
+        U.toast('开始读《' + bk + '》，30 分钟后才能打卡');
+        return true;
+      }
       if (name === 'readCheck') {
-        var book = Kid.readPick || '';
-        var rres = E.finishReading(book, 0);
-        if (rres && rres.dup) { U.toast('今天已经漂过啦，明天再来 🐚'); return false; }
+        var bi2 = document.getElementById('read-book');
+        var bk2 = (bi2 ? String(bi2.value || '').trim() : '') || Kid.readPick || '';
+        if (!bk2) { U.toast('先写上今天读的是哪本书'); return false; }
+        var tm2 = Kid.readTimerOf();
+        if (!tm2) { U.toast('要先点「开始读 30 分钟」哦'); return false; }
+        if (Date.now() < tm2.end) {
+          var leftMin = Math.ceil((tm2.end - Date.now()) / 60000);
+          U.modal({
+            emoji: '⏳', title: '还没读满 30 分钟',
+            text: '还差 ' + leftMin + ' 分钟呢。\n再坚持一会儿，读完才能拿到水滴～',
+            buttons: [{ text: '好，我继续读', cls: 'btn-green' }]
+          });
+          return false;
+        }
+        /* 到点了 → 提交给妈妈审核（不是直接给水滴） */
+        var rres = E.finishReading(bk2, 0, true);
+        if (rres && rres.dup) { U.toast('今天已经交过啦，等妈妈确认就好 🐚'); return false; }
+        Kid.readClearTimer();
         Kid.readPick = '';
-        var readNow = S.state.water;
         U.modal({
-          emoji: '🐚', title: '阅读打卡成功 +💧' + (rres.water || 10),
-          text: (book ? '今天读的是《' + book + '》。\n' : '今天读了书。\n') +
-            '获得 💧 ' + (rres.water || 10) + ' 水滴，现在一共 💧 ' + readNow + '。\n' +
-            '这是选做任务，读了就有，不用等妈妈点亮。',
-          buttons: [{ text: '好！', cls: 'btn-green', onClick: function (c) { c(); App.afterChange(); } }]
+          emoji: '📮', title: '交给妈妈啦',
+          text: '《' + bk2 + '》读满 30 分钟，已经发给妈妈了。\n' +
+            '妈妈确认之后，💧 10 滴才会到账哦。',
+          buttons: [{ text: '好', cls: 'btn-green', onClick: function (c) { c(); App.afterChange(); } }]
         });
         return false;
       }
