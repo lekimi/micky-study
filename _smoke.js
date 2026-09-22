@@ -29,6 +29,28 @@ function ok(name, cond, extra) {
 }
 
 S.load();
+
+/* ---- 方案B：默认「提交自动通过」= 开（妈妈不在旁边时孩子不被卡住） ---- */
+(function () {
+  const d = global.Store;
+  ok('新装默认开着自动通过', d.state.autoApprove === true);
+  ok('默认没被妈妈拨过（autoApproveSet=0）', d.state.autoApproveSet === 0);
+  /* 就算老数据里是关的，只要妈妈没亲手拨过，也会被拉成开 */
+  d.state.autoApprove = false; d.state.autoApproveSet = 0;
+  d.save(); d.load();
+  ok('没拨过开关 → 重新 load 后仍是开', d.state.autoApprove === true);
+  /* 妈妈亲手关掉 → 以后必须尊重她的选择，不能再被默认值盖回去
+     （这里直接改状态模拟妈妈拨开关；下面另外断言 parent.js 真的会置位） */
+  d.state.autoApprove = false; d.state.autoApproveSet = 1;
+  d.save(); d.load();
+  ok('妈妈的选择不会被默认值覆盖', d.state.autoApprove === false);
+  const psrc = require('fs').readFileSync(require('path').join(__dirname, 'js', 'parent.js'), 'utf8');
+  ok('parent.js 的 toggleAuto 会置 autoApproveSet', /toggleAuto[\s\S]{0,300}autoApproveSet\s*=\s*1/.test(psrc));
+  /* 复原成方案B（开） */
+  d.state.autoApprove = true; d.state.autoApproveSet = 0;
+  d.save();
+})();
+
 S.state.autoApprove = true;
 const today = S.dateStr();
 console.log('今天 =', today, '周' + S.WEEK_CN[S.dayIndex(today)]);
