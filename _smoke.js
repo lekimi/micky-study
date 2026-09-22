@@ -256,6 +256,7 @@ console.log('\n--- 页面渲染冒烟 ---');
 eval(fs.readFileSync(path.join(dir, 'ui.js'), 'utf8'));
 eval(fs.readFileSync(path.join(dir, 'kid.js'), 'utf8'));
 eval(fs.readFileSync(path.join(dir, 'parent.js'), 'utf8'));
+eval(fs.readFileSync(path.join(dir, 'picwrite.js'), 'utf8'));
 ok('Kid / Parent 模块加载', !!global.Kid && !!global.Parent);
 S.state.tasks.push({ id: 'wkA', title: '土豆老师 P12-13', emoji: '📐', kind: 'weekly', subject: 'math', weekStart: mon, due: fri });
 S.state.tasks.push({ id: 'scA', title: '校内：朗读第5课', emoji: '🏫', kind: 'school', subject: 'chinese', date: today });
@@ -279,6 +280,48 @@ ok('英语页含顺序听力播放器', he.indexOf('朗文听力') > 0 && he.ind
 ok('精简模式下英语页不含阅读题', he.indexOf('朗文阅读练习') < 0);
 global.Kid.page = 'chinese';
 ok('语文页含讲述工坊', global.Kid.render().indexOf('今日讲述') > 0);
+ok('语文页含看图写话', global.Kid.render().indexOf('看图写话') > 0);
+ok('语文页含语文学习园入口', global.Kid.render().indexOf('语文学习园') > 0);
+/* 单独验「每日固定任务按顺序做」：一项通过才解锁下一项；
+   计算小超市在「等妈妈确认」期间，下一项也能先开始计时（其它板块不再被锁） */
+(function () {
+  const ln = global.Kid.lean();
+  ln.afterTasks = 1;                              // 开着「先做完正事」
+  const date = global.Store.dateStr();
+  const fixed = global.Store.fixedTasksOf(date);  // 已按 order 排序
+  /* 清掉更前面测试（每日奖励）已通过的固定任务，保证从「全都没做」开始验 */
+  global.Store.state.submissions = global.Store.state.submissions.filter(s =>
+    !(s.date === date && fixed.some(t => t.id === s.taskId)));
+  ok('今天有 3 项固定任务', fixed.length === 3);
+  ok('语文页不再被锁住', global.Kid.render().indexOf('先把正事做完') < 0);
+  ok('第 1 项默认解锁', global.Kid.fixedUnlocked(fixed[0].id, date) === true);
+  ok('第 2 项初始锁定', global.Kid.fixedUnlocked(fixed[1].id, date) === false);
+  ok('第 3 项初始锁定', global.Kid.fixedUnlocked(fixed[2].id, date) === false);
+  /* 第 1 项通过 → 第 2 项解锁 */
+  global.Engine.submitTask(fixed[0].id, '测');
+  global.Store.state.submissions.forEach(s => {
+    if (s.taskId === fixed[0].id && s.date === date && s.status === 'submitted') s.status = 'approved';
+  });
+  ok('第 1 项通过后第 2 项解锁', global.Kid.fixedUnlocked(fixed[1].id, date) === true);
+  /* 第 2 项（计算小超市，带 early）提交=等妈妈，此时第 3 项也应解锁 */
+  ok('计算小超市带 early 标志', !!fixed[1].early === true);
+  global.Engine.submitTask(fixed[1].id, '测');
+  /* 自动通过模式下把它退回「等妈妈确认」，专门验这条例外 */
+  global.Store.state.submissions.forEach(s => {
+    if (s.taskId === fixed[1].id && s.date === date && s.status === 'approved') s.status = 'submitted';
+  });
+  ok('计算等妈妈确认时第 3 项已解锁', global.Kid.fixedUnlocked(fixed[2].id, date) === true);
+  /* 关掉开关 → 三项同时开放 */
+  ok('关掉开关后三项全解锁', (function () {
+    ln.afterTasks = 0;
+    const a = global.Kid.fixedUnlocked(fixed[1].id, date) && global.Kid.fixedUnlocked(fixed[2].id, date);
+    ln.afterTasks = 1;
+    return a;
+  })() === true);
+  /* 还原：清掉这次测试产生的提交，避免影响后面断言 */
+  global.Store.state.submissions = global.Store.state.submissions.filter(s =>
+    !(s.date === date && (s.taskId === fixed[0].id || s.taskId === fixed[1].id)));
+})();
 ok('语文页含语文学习园入口', global.Kid.render().indexOf('语文学习园') > 0);
 // 语文园四个子页 + 生字闯关各级
 [['chars', '选一课开始'], ['preview', '整本书目录'], ['recite', '背诵闯关'], ['read', '故事海漂流'], ['dict', '听写练习']].forEach(function (x) {
@@ -549,6 +592,7 @@ ok('倒计时 · 未启动显示开始按钮', global.Kid.timerHtml('TEST', 10).
   const ids = fxs.map(t => t.id).concat(['e_read']);
   S.state.submissions = S.state.submissions.filter(x => !(x.date === today && ids.indexOf(x.taskId) >= 0));
   S.save();
+  const _at = global.Kid.lean().afterTasks; global.Kid.lean().afterTasks = 0; // 计时状态测试不关顺序锁
 
   global.Kid.cnTab = ''; global.Kid.enrResult = null; global.Kid.enrAns = {}; global.Kid.enrDay = 0;
   let hcn = '', hen = '', hhome = '';
@@ -581,6 +625,7 @@ ok('倒计时 · 未启动显示开始按钮', global.Kid.timerHtml('TEST', 10).
     (seg3.match(/时间到啦，打卡/g) || []).length);
   fxs.forEach(t => global.Kid.timerEnd(t.id));
   S.save();
+  global.Kid.lean().afterTasks = _at;
 })();
 
 // 背诵闯关：清单 + 五种玩法
