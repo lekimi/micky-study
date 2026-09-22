@@ -16,10 +16,99 @@
   var DAILY_QUIZ = 8;        /* 一次考察几题 */
   var WRONG_STEP = 1;        /* 熟练度升降步长 */
 
-  /* ---------------- 数据 ---------------- */
+  /* ---------------- 数据 ----------------
+     两层词典：
+       ① DICT_CORE  —— 内置核心词（牛津核心 + 教材 + 高频），随页面加载，秒查
+       ② DICT_D     —— 全量分片（a.js ~ z.js，共 76 万词），查不到时按首字母按需加载
+     设计原因：76 万词一次性塞进页面要 42MB，首屏会卡死；按需加载则每次只取 1~2MB。 */
+  var loaded = {};        /* 已加载的分片：{ a: {word: entry}, b: ... } */
+  var loading = {};       /* 正在加载的分片 */
+
   function st() { return S().state; }
 
-  function dict() { return global.WORDS2A || { list: [], cats: [] }; }
+  function core() { return global.DICT_CORE || null; }
+
+  /* 核心词库转成 [{en,zh,cat}] 形式，供既有逻辑复用 */
+  var coreListCache = null;
+  function coreList() {
+    if (coreListCache) return coreListCache;
+    var C = core();
+    if (!C) return [];
+    var out = [];
+    for (var w in C) {
+      var e = C[w];
+      out.push({ en: w, zh: (e && e[1]) || '', cat: '核心', ph: (e && e[0]) || '' });
+    }
+    coreListCache = out;
+    return out;
+  }
+
+  function shardOf(letter) {
+    var d = loaded[letter];
+    if (!d) return [];
+    var out = [];
+    for (var w in d) {
+      var e = d[w];
+      out.push({ en: w, zh: (e && e[1]) || '', cat: '大词典', ph: (e && e[0]) || '' });
+    }
+    return out;
+  }
+
+  /* dict() —— 查词用：教材词 + 核心词 + 已加载分片（越全越好）
+     三个来源有重叠（teacher 三处都有），必须去重，否则查词会出两张一样的卡。
+     教材词优先（释义最贴合课本），结果做了缓存，加载新分片时才重建。 */
+  var dictCache = null;
+  function dict() {
+    if (dictCache) return dictCache;
+    var seen = {}, list = [];
+    function push(arr) {
+      for (var i = 0; i < arr.length; i++) {
+        var k = String(arr[i].en || '').toLowerCase();
+        if (!k || seen[k]) continue;
+        seen[k] = 1;
+        list.push(arr[i]);
+      }
+    }
+    push((global.WORDS2A && global.WORDS2A.list) || []);   /* 教材词优先 */
+    push(coreList());
+    for (var k in loaded) push(shardOf(k));
+    dictCache = { list: list, cats: (global.WORDS2A && global.WORDS2A.cats) || [] };
+    return dictCache;
+  }
+
+  /* bookDict() —— 出题干扰项用：只用教材词库。
+     因为干扰项要「同类词」（老师/医生/护士放一起才有区分度），
+     而大词典的词没有年级分类，混进来会出现超纲的生僻干扰项。 */
+  function bookDict() { return global.WORDS2A || { list: [], cats: [] }; }
+
+  /* 这个词的首字母属于哪个分片 */
+  function shardKey(word) {
+    var c = String(word || '').trim().toLowerCase();
+    c = c.charAt(0);
+    return ('a' <= c && c <= 'z') ? c : '0';
+  }
+
+  /* 按需加载分片（不阻塞，加载完回调） */
+  function loadShard(letter, cb) {
+    if (loaded[letter]) { cb && cb(true); return; }
+    if (loading[letter]) { cb && cb(false); return; }
+    loading[letter] = 1;
+    try {
+      var s = document.createElement('script');
+      s.src = 'data/dict/' + letter + '.js';
+      s.onload = function () {
+        /* ⚠️ window.DICT_D 会被下一个分片覆盖，必须在 onload 里立刻取走 */
+        loaded[letter] = global.DICT_D || {};
+        dictCache = null;          /* 新分片进来了，缓存要重建 */
+        loading[letter] = 0;
+        cb && cb(true);
+      };
+      s.onerror = function () { loading[letter] = 0; cb && cb(false); };
+      (document.body || document.documentElement).appendChild(s);
+    } catch (e) {
+      loading[letter] = 0; cb && cb(false);
+    }
+  }
 
   function wb() {
     var s = st();
@@ -224,7 +313,7 @@
 
   /* 干扰项：优先同类别（老师/医生/护士放一起才有区分度） */
   function distractors(word, n) {
-    var all = dict().list;
+    var all = bookDict().list;   /* 只从教材词库挑，避免出超纲干扰项 */
     var same = all.filter(function (x) {
       return x.cat === word.cat && String(x.zh) !== String(word.zh);
     });
@@ -374,7 +463,14 @@
       '</div>';
 
     var resultHtml = '';
-    if (WordBook.result && kw) resultHtml = searchResultHtml(WordBook.result, kw);
+    if (WordBook.busy) {
+      resultHtml = '<div style="background:#EAF3FB;border:2px solid #B5D4F4;border-radius:14px;padding:12px;margin-top:8px">' +
+        '<div style="font-weight:900;color:#185FA5">🔍 正在大词典里翻…</div>' +
+        '<div class="muted" style="margin-top:4px">这个词不在常用词里，我去 76 万词的大词典里找找。</div>' +
+        '</div>';
+    } else if (WordBook.result && kw) {
+      resultHtml = searchResultHtml(WordBook.result, kw);
+    }
 
     var bookHtml = book.length
       ? book.map(function (w) {
@@ -529,13 +625,51 @@
     });
   }
 
+  /* 查词总入口：先查内置核心词库，查不到就去加载对应的大词典分片再查一次。
+     返回 Promise，界面负责显示「正在翻大词典…」。 */
+  function lookup(kw) {
+    return new Promise(function (resolve) {
+      var r = search(kw);
+      if (r.hit !== 'none') { resolve(r); return; }
+      if (isChinese(kw)) { resolve(r); return; }   /* 中译英只在核心词库里做，全量太慢 */
+
+      var key = shardKey(kw);
+      if (loaded[key]) { resolve(r); return; }     /* 已加载过还是没有 → 真没有 */
+
+      loadShard(key, function (okLoad) {
+        if (!okLoad) { resolve(r); return; }
+        resolve(search(kw));                        /* 用大词典再查一次 */
+      });
+    });
+  }
+
   function act(name, v) {
     if (name === 'wbSearch') {
       var el = document.getElementById('wb-input');
       var kw = el ? String(el.value || '').trim() : '';
       WordBook.kw = kw;
-      WordBook.result = search(kw);
-      if (!kw) UI().toast('先打一个单词');
+      if (!kw) { UI().toast('先打一个单词'); return true; }
+
+      var first = search(kw);
+      if (first.hit !== 'none' || isChinese(kw)) {
+        WordBook.result = first;
+        WordBook.busy = false;
+        return true;
+      }
+      /* 内置词库没有 → 去翻大词典（76 万词） */
+      var key = shardKey(kw);
+      if (!loaded[key]) {
+        WordBook.busy = true;
+        WordBook.result = null;
+        lookup(kw).then(function (r) {
+          WordBook.result = r;
+          WordBook.busy = false;
+          if (global.App) global.App.render();
+          if (r.hit === 'none') UI().toast('大词典里也没有这个词');
+        });
+      } else {
+        WordBook.result = first;
+      }
       return true;
     }
     if (name === 'wbAdd') {
@@ -596,6 +730,11 @@
 
   var WordBook = {
     dict: dict,
+    bookDict: bookDict,
+    coreList: coreList,
+    loadShard: loadShard,
+    shardKey: shardKey,
+    lookup: lookup,
     search: search,
     has: has,
     add: add,
