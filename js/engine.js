@@ -255,27 +255,44 @@
     },
 
     /* ============ 故事海漂流 · 阅读看书（选做任务，每天一次 +10 水滴） ============ */
-    finishReading: function (book, minutes) {
+    /* needReview=true（现在的默认做法）：读满 30 分钟后提交给妈妈，
+       妈妈确认才发水滴 —— 防止「东看一下西看一下」也算读完。
+       needReview=false：老的即时发放（保留兼容）。 */
+    finishReading: function (book, minutes, needReview) {
       var s = st();
       var date = today();
       if (S.isApproved('e_read', date)) return { dup: true };
       var water = 10;
 
-      if (!s.readLog) s.readLog = [];
-      s.readLog.push({
+      var rec = {
         id: S.uid(), date: date, book: book || '自由阅读',
-        minutes: minutes || 0, water: water
-      });
-      /* 直接记一条「已通过」的提交，孩子不用等妈妈点亮 */
+        minutes: minutes || Kid.READ_MIN || 30, water: water,
+        status: needReview ? 'submitted' : 'approved'
+      };
+      if (!s.readLog) s.readLog = [];
+      s.readLog.push(rec);
+
       s.submissions.push({
         id: S.uid(), taskId: 'e_read', title: '故事海漂流 · 阅读看书',
         subject: 'chinese', kind: 'extra', date: date,
-        note: '读了《' + (book || '自由阅读') + '》', status: 'approved',
-        water: water, sun: 0, at: Date.now(), reviewedAt: Date.now()
+        note: '读了《' + (book || '自由阅读') + '》' + (rec.minutes ? ' ' + rec.minutes + ' 分钟' : ''),
+        status: needReview ? 'submitted' : 'approved',
+        water: water, sun: 0, at: Date.now(),
+        reviewedAt: needReview ? null : Date.now()
       });
-      Engine.addWater(water, '故事海漂流 · 阅读看书', date);
+
+      /* 需要妈妈确认时先不给水滴，等 E.approve() 通过后才发 */
+      if (!needReview) Engine.addWater(water, '故事海漂流 · 阅读看书', date);
       S.save();
-      return { ok: true, water: water };
+      return { ok: true, water: water, needReview: !!needReview };
+    },
+
+    /* 今天有没有「等着妈妈确认」的阅读打卡 */
+    readingPending: function (date) {
+      var d = date || today();
+      return (st().readLog || []).filter(function (r) {
+        return r.date === d && r.status === 'submitted';
+      })[0] || null;
     },
 
     /* ============ 计算小超市：提前完成按剩余分钟发水滴 ============ */
@@ -389,6 +406,12 @@
       sub.sun = rw.sun;
       applyReward(rw, (sub.kind === 'weekly' ? '本周任务：' : '') + sub.title + '（周' + S.WEEK_CN[S.dayIndex(sub.date)] + '完成）', sub.date);
       if (sub.kind === 'school') Engine.homeworkDone(task || { title: sub.title, subject: sub.subject }, sub.date);
+      /* 阅读打卡：妈妈通过后，把 readLog 里那条也标成 approved（水滴这时才真到账） */
+      if (sub.taskId === 'e_read') {
+        (st().readLog || []).forEach(function (r) {
+          if (r.date === sub.date && r.status === 'submitted') r.status = 'approved';
+        });
+      }
       Engine.checkDailyBonus(sub.date);
       S.save();
       return sub;
