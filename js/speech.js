@@ -142,10 +142,15 @@
     return n;
   }
 
+  /* 一轮最多问几句：孩子在这个板块待太久会烦，
+     4 句基本就能把「情节 + 重点 + 一个五感 + 心情」补齐，剩下的交给他自己。 */
+  var MAX_ROUND = 4;
+
   /* ---------------- 引导：下一轮问什么 ----------------
      asked 是已经问过的维度 key 数组，避免重复问同一个 */
-  function nextGuide(text, asked) {
+  function nextGuide(text, asked, maxRound) {
     asked = asked || [];
+    if (asked.length >= (maxRound || MAX_ROUND)) return null;   /* 到点就收，不无限问下去 */
     for (var i = 0; i < GUIDE.length; i++) {
       var g = GUIDE[i];
       if (asked.indexOf(g.key) >= 0) continue;     /* 问过就不再问 */
@@ -285,8 +290,9 @@
   }
 
   /* ---------------- 大模型版本（配了 Key 才走） ---------------- */
-  function llmGuide(text, asked, kidName, cfg) {
-    var g = nextGuide(text, asked);
+  function llmGuide(text, asked, kidName, cfg, maxRound) {
+    var g = nextGuide(text, asked, maxRound);
+    if (!g) return Promise.resolve(null);        /* 问够了就收，别让大模型继续追问 */
     var want = g ? g.label : '';
     var SYS = '你是一位小学语文老师，正在辅导二年级男孩' + (kidName || '孩子') + '把一件事说完整。\n' +
       '铁律：你只能提问，**绝对不能替他写出任何句子**，不能给范文、不能给开头、不能说「你可以写……」。\n' +
@@ -390,6 +396,7 @@
   var SpeechCoach = {
     GUIDE: GUIDE,
     PHRASES: PHRASES,
+    MAX_ROUND: MAX_ROUND,
     tidyText: tidyText,
     phrasesFor: function (key) { return PHRASES[key] || PHRASES.word; },
     nextGuide: nextGuide,
@@ -402,15 +409,15 @@
     len: len,
 
     /* 统一入口：返回 Promise，连不上 / 没配 Key 自动退回本地 */
-    guide: function (text, asked, kidName, cfg) {
+    guide: function (text, asked, kidName, cfg, maxRound) {
       cfg = cfg || {};
       if (cfg.enabled && cfg.apiKey) {
-        return llmGuide(text, asked, kidName, cfg)['catch'](function () {
-          var g = nextGuide(text, asked);
+        return llmGuide(text, asked, kidName, cfg, maxRound)['catch'](function () {
+          var g = nextGuide(text, asked, maxRound);
           return g ? g : null;
         });
       }
-      return Promise.resolve(nextGuide(text, asked));
+      return Promise.resolve(nextGuide(text, asked, maxRound));
     },
 
     score: function (text, origin, kidName, cfg) {
