@@ -263,7 +263,7 @@
       flowers: 0,                // 🌸 小红花（老师作业完成数，不抵水滴）
       hwLog: [],                 // 老师作业打卡记录 {id,date,title,subject}
       ai: { enabled: false, provider: '', apiKey: '', model: '', baseUrl: '' },
-      sound: { on: 1 },               // 倒计时语音/音乐提醒（练字·计算小超市 快到时）
+      sound: { on: 1, muteDate: '' }, // 倒计时语音/音乐提醒（练字·计算小超市 快到时）；muteDate=今天 → 今天不再响
       coach: { praise: {}, week: {} }, // 妈妈端「今日表扬 / 本周成长」缓存（AI 填过就存）
       /* ↓↓↓ 五个「暖心小功能」（2026-09-22 加，老数据会自动补上，不用重新导出备份） */
       mood: {},                  // 心情天气 {'2026-09-22':{m:'sun'|'cloud'|'rain'|'storm', share:0|1, at}}
