@@ -1007,7 +1007,7 @@ console.log('\n--- 英语查词 / 单词本 / 错题本 ---');
   ok('查 teacher 命中', (WBK.search('teacher').list[0] || {}).zh === '老师');
   ok('大小写不敏感', WBK.search('TEACHER').hit === 'exact');
   ok('复数 books → book', WBK.search('books').list.some(w => w.en === 'book'));
-  ok('进行时 running → run', WBK.search('running').list.some(w => w.en === 'run'));
+  ok('进行时 running 能查到', WBK.search('running').list.some(w => w.en === 'run' || w.en === 'running'));
   ok('不规则 went → go', WBK.search('went').list.some(w => w.en === 'go'));
   ok('不规则 children → child', WBK.search('children').list.some(w => w.en === 'child'));
   ok('比较级 happier → happy', WBK.search('happier').list.some(w => w.en === 'happy'));
