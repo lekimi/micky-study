@@ -54,11 +54,55 @@
     babies2: 'baby', oranges: 'orange', fish: 'fish', sheep: 'sheep'
   };
 
-  /* ---------------- 查词 ---------------- */
-  /* 返回 {hit:'exact'|'part', list:[...]} —— 谁在查，就给他结果，不教育 */
-  function search(kw) {
-    var q = String(kw || '').trim().toLowerCase();
+  /* ---------------- 中译英 ----------------
+     中文释义有各种写法："老师" / "老师；教师" / "n. 老师, 教师"，
+     所以先把义项拆开再比，精确义项 > 开头匹配 > 包含匹配。 */
+  var CN_RE = /[\u4e00-\u9fa5]/;
+
+  function isChinese(s) { return CN_RE.test(String(s || '')); }
+
+  function zhItems(zh) {
+    return String(zh || '')
+      .replace(/\b(n|v|vt|vi|adj|adv|prep|conj|pron|art|num|int|aux|abbr)\s*\./gi, '')
+      .split(/[；;，,、\/|（）()\[\]]/)
+      .map(function (s) { return s.trim(); })
+      .filter(function (s) { return s && CN_RE.test(s); });
+  }
+
+  function searchZh(kw) {
+    var q = String(kw || '').trim();
     if (!q) return { hit: 'none', list: [] };
+    var all = dict().list;
+
+    var exact = [], head = [], part = [];
+    all.forEach(function (w) {
+      var items = zhItems(w.zh);
+      var hitType = 0;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i] === q) { hitType = 3; break; }             /* 整个义项一模一样 */
+        if (items[i].indexOf(q) === 0) hitType = Math.max(hitType, 2);
+        else if (items[i].indexOf(q) >= 0) hitType = Math.max(hitType, 1);
+      }
+      if (hitType === 3) exact.push(w);
+      else if (hitType === 2) head.push(w);
+      else if (hitType === 1) part.push(w);
+    });
+
+    if (exact.length) return { hit: 'exact', list: exact, dir: 'zh' };
+    var out = head.concat(part);
+    if (out.length) return { hit: 'part', list: out.slice(0, 12), dir: 'zh' };
+    return { hit: 'none', list: [], dir: 'zh' };
+  }
+
+  /* ---------------- 查词 ---------------- */
+  /* 返回 {hit:'exact'|'part', list:[...], dir:'en'|'zh'}
+     输入含中文 → 中译英；否则英译中。谁在查就给他结果，不教育。 */
+  function search(kw) {
+    var raw = String(kw || '').trim();
+    if (!raw) return { hit: 'none', list: [] };
+    if (isChinese(raw)) return searchZh(raw);
+
+    var q = raw.toLowerCase();
     var all = dict().list;
 
     var exact = all.filter(function (w) { return String(w.en).toLowerCase() === q; });
@@ -277,11 +321,15 @@
   var BRIGHT = { 1: '⭐', 2: '⭐⭐', 3: '⭐⭐⭐' };
 
   function searchResultHtml(res, kw) {
+    var zhDir = res.dir === 'zh';
     if (res.hit === 'none') {
       return '<div style="background:#FFF8E4;border:2px solid #EFDDB8;border-radius:14px;padding:12px;margin-top:8px">' +
-        '<div style="font-weight:900;color:#5C4322">词库里没找到「' + UI().esc(kw) + '」</div>' +
-        '<div class="muted" style="margin-top:4px">看看是不是拼错了？也可以先问老师，回来再加进单词本。</div>' +
-        '</div>';
+        '<div style="font-weight:900;color:#5C4322">没找到「' + UI().esc(kw) + '」</div>' +
+        '<div class="muted" style="margin-top:4px">' +
+        (zhDir
+          ? '换一个说法试试？比如查「老师」找不出，可以试试「教师」。'
+          : '看看是不是拼错了？也可以在词中间少打几个字母，比如 stud 能找到 study。') +
+        '</div></div>';
     }
     var rows = res.list.map(function (w) {
       var inBook = has(w.en);
@@ -300,9 +348,13 @@
           : '<button class="btn btn-green mt8" data-act="wbAdd" data-v="' + UI().esc(w.en) + '">+ 加进我的单词本</button>') +
         '</div>';
     }).join('');
-    var head = res.hit === 'part'
-      ? '<div class="muted" style="margin-top:8px">没有一模一样的，这几个有点像：</div>'
-      : '';
+    var head = '';
+    if (res.hit === 'part') {
+      head = '<div class="muted" style="margin-top:8px">' +
+        (zhDir ? '这个意思能找到这几个词：' : '没有一模一样的，这几个有点像：') + '</div>';
+    } else if (zhDir && res.list.length > 1) {
+      head = '<div class="muted" style="margin-top:8px">「' + UI().esc(kw) + '」能找到这几个词：</div>';
+    }
     return head + rows;
   }
 
@@ -314,8 +366,11 @@
     var kw = WordBook.kw || '';
 
     var inputHtml = '<div style="display:flex;gap:8px">' +
-      '<input class="field" id="wb-input" placeholder="打一个英文单词，比如 teacher" value="' + UI().esc(kw) + '" style="flex:1;text-align:left">' +
+      '<input class="field" id="wb-input" placeholder="打英文或中文都行，比如 teacher / 老师" value="' + UI().esc(kw) + '" style="flex:1;text-align:left">' +
       '<button class="btn btn-green" style="width:auto;min-height:52px;padding:10px 18px" data-act="wbSearch">查一查</button>' +
+      '</div>' +
+      '<div class="muted" style="font-size:12px;margin-top:6px">' +
+      '打英文 → 出中文意思；打中文 → 出对应的英文单词。两个方向都能查。' +
       '</div>';
 
     var resultHtml = '';
