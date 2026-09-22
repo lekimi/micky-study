@@ -1851,6 +1851,12 @@
           if (left <= 60) { el.style.color = '#C0392B'; el.style.background = '#FDECEA'; }
         }
       }
+      /* 提醒「开始响」/「响完了」→ 各重绘一次，让「🔇 别说了」那条出现、响完自己消失。
+         只在状态翻转的那一秒画一次，不会变成每秒重绘。 */
+      if (global.Sound && global.Sound.isPlaying) {
+        var sp = global.Sound.isPlaying() ? 1 : 0;
+        if (Kid._soundOn !== sp) { Kid._soundOn = sp; needRender = true; }
+      }
       if (needRender && global.App && global.App.render) {
         setTimeout(function () { try { global.App.render(); } catch (e) { } }, 60);
       }
@@ -3091,6 +3097,22 @@
         '</div>';
     },
 
+    /* 🔇 语音/音乐正在响时的「停」条：只在这一刻出现，停了就自己消失 */
+    soundStopBar: function () {
+      if (!global.Sound || !global.Sound.isPlaying || !global.Sound.isPlaying()) return '';
+      return '<div class="card mt12" style="background:#FFF3F6;border:2px solid #F0C7D4">' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+        '<div style="font-size:30px;line-height:1">🔔</div>' +
+        '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:900;color:#8A4A5E;font-size:15px">提醒正在响</div>' +
+        '<div class="muted" style="font-size:12px">不想听就点一下，马上安静</div>' +
+        '</div></div>' +
+        '<div class="flex gap8 mt8" style="flex-wrap:wrap">' +
+        '<button class="btn btn-lav" style="flex:1;min-height:56px;font-size:15px" data-act="soundStop">🔇 停，别说了</button>' +
+        '<button class="btn btn-ghost" style="flex:1;min-height:56px;font-size:14px" data-act="soundMuteToday">🚫 今天都不再响</button>' +
+        '</div></div>';
+    },
+
     render: function () {
       var html = '';
       var lock = S.appTimeUp() && Kid.page !== 'home' && Kid.page !== 'reward';
@@ -3100,6 +3122,9 @@
       } else if (Kid.page === 'home') html = Kid.pageHome();
       else if (Kid.page === 'reward') html = Kid.pageReward();
       else html = Kid.pageSubject(Kid.page);
+
+      /* 🔇 提醒正在响 → 任何页面最上面都给一个「别说了」的出口（高敏感孩子必需） */
+      html = Kid.soundStopBar() + html;
 
       var tabs = [
         { k: 'home', e: '🏡', t: '首页' },
@@ -3821,6 +3846,19 @@
         App.render();
         U.toast('换好啦，再来 10 个');
         return false;
+      }
+
+      /* 🔇 立刻停掉正在响的语音和音乐（孩子在结束闹铃响起后按的） */
+      if (name === 'soundStop') {
+        if (global.Sound) global.Sound.stop();
+        U.toast('好，安静了 🤫');
+        return true;
+      }
+      /* 🚫 今天剩下的提醒都不出声，明天自动恢复 */
+      if (name === 'soundMuteToday') {
+        if (global.Sound) global.Sound.muteToday();
+        U.toast('好，今天都不再提醒了，明天会自动开回来');
+        return true;
       }
 
       /* ---------- 倒计时 ---------- */
