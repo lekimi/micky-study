@@ -524,8 +524,15 @@
       if (done.rewriteOpen && done.rewrite) {
         polishHtml = '<div style="background:#F3F0FF;border:2px solid #D9C7F2;border-radius:14px;padding:12px;margin-top:10px">' +
           '<div class="sec-title" style="font-size:14px">✨ 老师改写的更高分版本</div>' +
-          '<div class="muted" style="font-size:12px;margin-bottom:6px">事情、人物、经过都是你自己写的，老师只改了表达。' +
+          '<div class="muted" style="font-size:12px;margin-bottom:6px">事情、人物、经过都是你自己写的。' +
+          '老师只做了三件事：理顺顺序、加关联词、补好词好句和五感（看到的·听到的·摸到的…）。' +
           (done.rewriteMode === 'llm' ? '' : '（本地示范版）') + '</div>' +
+          ((done.rewriteMethods || []).length
+            ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">' +
+            (done.rewriteMethods || []).map(function (m) {
+              return '<span class="task-tag ok" style="font-size:11px">🛠️ ' + U.esc(m) + '</span>';
+            }).join('') + '</div>'
+            : '') +
           '<div style="background:#fff;border-radius:12px;padding:10px;line-height:1.9;font-weight:700;color:#4A3A6B">' +
           U.esc(done.rewrite) + '</div>' +
           ((done.rewriteChanges || []).length
@@ -542,7 +549,8 @@
         : '';
 
       return '<div class="card card-cream mt12">' +
-        '<div class="sec-title">🎤 今日讲述 · 已完成' + ((done.times || 1) > 1 ? '（第 ' + done.times + ' 次）' : '') + '</div>' +
+        '<div class="sec-title">🎤 今日讲述 · 已完成' +
+        (done.reworks ? '（后来又补了 ' + done.reworks + ' 次）' : '') + '</div>' +
         '<div style="text-align:center;padding:4px 0 10px">' +
         '<div style="font-size:44px;font-weight:900;color:#E0A020;line-height:1.1">' + done.score + '<span style="font-size:18px">分</span></div>' +
         '<div class="muted" style="font-weight:800">' + U.esc(global.AI.rewardText(done)) + '</div>' +
@@ -557,7 +565,6 @@
         }).join('') +
         cmp +
         polishHtml + polishBtn +
-        '<button class="btn btn-ghost mt8" data-act="respeech">再讲一次</button>' +
         '</div>';
     },
 
@@ -607,14 +614,24 @@
           '<button class="btn btn-ghost" style="width:auto;min-height:52px;padding:10px 16px;font-size:14px" data-act="spSkip">这个我没有</button>' +
           '</div>' +
           Kid.micBar();
+      } else if (miss.length && d.asked.length >= Kid.guideCap()) {
+        /* 老师问够了 → 不无限追问，直接收尾；孩子想多说可以自己再开一轮 */
+        askHtml = '<div style="background:#EAF3D8;border:2px solid #B7DFB7;border-radius:14px;padding:10px;margin-top:10px">' +
+          '<div style="font-size:13px;font-weight:900;color:#3F6B1E">👩‍🏫 老师问完啦，剩下的交给你</div>' +
+          '<div class="muted" style="font-size:12px;margin-top:2px">' +
+          '已经补得挺完整了。看看上面，哪里还想加一句就自己加，加完点下面收尾。</div>' +
+          '<button class="btn btn-ghost mt8" data-act="spMoreRound" style="font-size:13px">➕ 我还想再让老师问一轮</button>' +
+          '</div>';
       } else if (miss.length) {
         askHtml = '<button class="btn btn-lav mt8" data-act="spAsk">🤔 让老师再问我一句</button>';
       }
 
       return '<div class="card card-cream mt12">' +
-        '<div class="sec-title">🎤 今日讲述 · 和老师一起把它说完整</div>' +
+        '<div class="sec-title">' + (d.cont ? '✏️ 接着把这篇补得更完整' : '🎤 今日讲述 · 和老师一起把它说完整') + '</div>' +
         '<div class="muted" style="font-size:13px">' +
-        '老师不会替你写，只会一句一句问你。你想到什么就说什么，说不出来可以点「这个我没有」。' +
+        (d.cont
+          ? '这就是你刚才写的那一篇。老师只挑还缺的地方问你，答完重新打分，分数取更高的一次。'
+          : '老师不会替你写，只会一句一句问你。你想到什么就说什么，说不出来可以点「这个我没有」。') +
         '</div>' +
         '<div style="height:12px;border-radius:6px;background:#EADFC0;overflow:hidden;margin:10px 0 6px">' +
         '<div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,#8FD44A,#5BA82B)"></div></div>' +
@@ -625,8 +642,15 @@
         '<div style="font-weight:700;color:#5C4322;line-height:1.9;margin-top:4px">' + U.esc(d.text) + '</div>' +
         '</div>' +
         askHtml +
-        '<button class="btn btn-ghost mt8" data-act="spFinish">✋ 我说完了，就这样</button>' +
+        '<button class="btn btn-ghost mt8" data-act="spFinish">' +
+        (d.cont ? '✋ 改好了，重新打分' : '✋ 我说完了，就这样') + '</button>' +
         '</div>';
+    },
+
+    /* 老师这一轮最多问几句（默认 4 句；孩子点了「再问一轮」就 +1） */
+    guideCap: function () {
+      var base = (global.SpeechCoach && global.SpeechCoach.MAX_ROUND) || 4;
+      return base + (Kid.spExtra || 0);
     },
 
     speechPanel: function (date) {
@@ -639,19 +663,21 @@
         if (Kid.picOpen) return global.PicWrite.panel();
       }
 
-      /* 今天提交次数用完 → 只展示成绩 */
-      if (done && !d && !E.speechCanSubmit(date)) {
-        return Kid.speechDoneHtml(done) +
-          '<div class="card mt12"><div class="muted" style="padding:6px 0;text-align:center">' +
-          '今天已经讲了 ' + E.speechCountToday(date) + ' 次啦，明天再来～</div></div>';
-      }
+      /* 今天讲完了 → 展示成绩；还能补的话给一个「接着把这篇补更好」的入口
+         （原来的「再讲一件事」已合并进来：不再开第二篇，改的是同一篇，省时间） */
       if (d) return Kid.speechCoachHtml(date);
-      if (done) return Kid.speechDoneHtml(done) +
-        '<div class="card card-cream mt12">' +
-        '<div class="sec-title" style="font-size:15px">🎤 再讲一件事</div>' +
-        '<div class="muted" style="font-size:13px">今天还能再讲 ' + (E.SPEECH_DAILY_MAX - E.speechCountToday(date)) + ' 次（第二次水滴减半）。</div>' +
-        Kid.speechStartHtml() +
-        '</div>';
+      if (done) {
+        var again = E.speechCanRework(date)
+          ? '<div class="card card-cream mt12">' +
+            '<div class="sec-title" style="font-size:15px">🌱 还能把这篇补得更完整</div>' +
+            '<div class="muted" style="font-size:13px">不用另起一篇——就在你刚才这篇上再加几句。' +
+            '老师会挑还缺的地方问你，改完分数取更高的一次，水滴只补差的。</div>' +
+            '<button class="btn btn-lav mt8" data-act="speechContinue">✏️ 接着补一补</button>' +
+            '</div>'
+          : '<div class="card mt12"><div class="muted" style="padding:6px 0;text-align:center">' +
+            '今天的讲述完成啦，明天再讲一篇新的～</div></div>';
+        return Kid.speechDoneHtml(done) + again;
+      }
 
       /* 全新的开始 */
       return '<div class="card card-cream mt12">' +
@@ -3342,10 +3368,16 @@
         return Kid.act('speechSubmit');
       }
 
+      /* 孩子还想多说 → 再多给一轮（默认问 4 句就收，别让他在这儿耗太久） */
+      if (name === 'spMoreRound') {
+        Kid.spExtra = (Kid.spExtra || 0) + 1;
+        return Kid.act('spAsk');
+      }
+
       if (name === 'spAsk') {
         var d0 = E.speechDraftOf(date);
         if (!d0) return true;
-        global.SpeechCoach.guide(d0.text, d0.asked, s.kidName, s.ai).then(function (g) {
+        global.SpeechCoach.guide(d0.text, d0.asked, s.kidName, s.ai, Kid.guideCap()).then(function (g) {
           Kid.spAsk = g;
           global.App.render();
         });
@@ -3473,6 +3505,12 @@
           });
           return false;
         }
+        if (d3.cont) {
+          U.confirm('这样改好了吗？',
+            '改完会重新打分，分数取更高的一次，水滴只补差的。\n（现在一共 ' + n0 + ' 个字）',
+            function () { Kid.act('speechSubmit'); }, '是的，改好啦');
+          return false;
+        }
         U.confirm('故事已经完整了吗？',
           '提交之后就打分给水滴了，不能再改。\n（现在一共 ' + n0 + ' 个字）',
           function () { Kid.act('speechSubmit'); }, '是的，讲完啦');
@@ -3487,6 +3525,7 @@
           global.AI.polish(last.text, s.ai).then(function (r) {
             last.rewrite = r.rewrite || '';
             last.rewriteChanges = r.changes || [];
+            last.rewriteMethods = r.methods || [];
             last.rewriteMode = r.mode || 'local';
             S.save();
             try { global.App.render(); } catch (e5) { }
@@ -3507,8 +3546,9 @@
           U.modal({ emoji: '🎤', title: '再多说一点点', text: '至少写 5 个字，老师才好打分哦～\n试试「今天在操场，我和……」' });
           return false;
         }
-        if (!E.speechCanSubmit(date)) {
-          U.toast('今天已经讲 ' + E.speechCountToday(date) + ' 次啦，明天再来');
+        var isCont = !!(dft && dft.cont);        /* 「接着补一补」模式：改的是同一篇 */
+        if (!isCont && !E.speechCanSubmit(date)) {
+          U.toast('今天的讲述已经完成啦，明天再来');
           return false;
         }
         U.modal({
@@ -3517,11 +3557,18 @@
           dismissible: false, buttons: []
         });
         global.SpeechCoach.score(text, origin, s.kidName, s.ai).then(function (res) {
-          var fin = E.finishSpeech2(text, origin, res, date);
+          var fin = E.finishSpeech2(text, origin, res, date, { cont: isCont });
           Kid.spAsk = null;
           var face = res.score >= 90 ? '🏆' : res.score >= 80 ? '🌟' : res.score >= 70 ? '🌻' : res.score >= 60 ? '🌱' : '💪';
-          var reward = '获得 💧 ' + fin.water + (fin.sun ? ' + ☀️ ' + fin.sun : '');
-          if (fin.times > 1) reward += '（今天第 ' + fin.times + ' 次，水滴减半）';
+          var reward;
+          if (isCont) {
+            reward = fin.water > 0
+              ? '补写得更好了！再得 💧 ' + fin.water + (fin.sun ? ' + ☀️ ' + fin.sun : '')
+              : '补写得更好了！分数涨了（水滴今天已拿满啦）';
+          } else {
+            reward = '获得 💧 ' + fin.water + (fin.sun ? ' + ☀️ ' + fin.sun : '');
+            if (fin.times > 1) reward += '（今天第 ' + fin.times + ' 次，水滴减半）';
+          }
 
           /* 好词好句：问孩子要不要存进素材库 */
           var good = res.good || [];
@@ -3580,10 +3627,25 @@
         return true;
       }
 
-      if (name === 'respeech') {
-        s.speech = (s.speech || []).filter(function (x) { return x.date !== date; });
-        S.save();
-        return true;
+      /* 🌱 接着补一补：把今天这篇重新打开，按还缺的维度再问几句（不再开第二篇） */
+      if (name === 'speechContinue') {
+        var lastR = (s.speech || []).filter(function (x) { return x.date === date; }).slice(-1)[0];
+        if (!lastR) return false;
+        if (!E.speechCanRework(date)) { U.toast('今天已经补过 ' + E.SPEECH_REWORK_MAX + ' 次啦，明天再来'); return false; }
+        E.speechDraftStart(lastR.text, date, { cont: 1 });
+        Kid.spExtra = 0;
+        U.modal({
+          emoji: '📖', title: '老师在看你还缺什么…',
+          text: (s.ai && s.ai.enabled) ? '请 AI 老师出题，稍等一下' : '马上就好',
+          dismissible: false, buttons: []
+        });
+        var dC = E.speechDraftOf(date);
+        global.SpeechCoach.guide(dC.text, dC.asked || [], s.kidName, s.ai, Kid.guideCap()).then(function (g) {
+          Kid.spAsk = g;
+          if (!g) U.toast('这篇已经挺完整的了，看看哪里还能再加点细节');
+          global.App.render();
+        });
+        return false;
       }
 
       if (name === 'quizSubmit') {
