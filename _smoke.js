@@ -274,7 +274,9 @@ S.state.tasks.push({ id: 'scA', title: '校内：朗读第5课', emoji: '🏫', 
 global.Kid.page = 'english';
 const he = global.Kid.render();
 ok('英语页含「本周任务」', he.indexOf('本周任务') > 0);
-ok('英语页含朗文阅读/听力', he.indexOf('朗文阅读练习') > 0 && he.indexOf('朗文听力练习') > 0);
+/* 精简模式（默认开）：阅读题关掉，听力改成按 L1、L2… 顺序播放的播放器 */
+ok('英语页含顺序听力播放器', he.indexOf('朗文听力') > 0 && he.indexOf('listenGo') > 0);
+ok('精简模式下英语页不含阅读题', he.indexOf('朗文阅读练习') < 0);
 global.Kid.page = 'chinese';
 ok('语文页含讲述工坊', global.Kid.render().indexOf('今日讲述') > 0);
 ok('语文页含语文学习园入口', global.Kid.render().indexOf('语文学习园') > 0);
@@ -502,10 +504,11 @@ ok('倒计时 · 未启动显示开始按钮', global.Kid.timerHtml('TEST', 10).
   }));
   ok('复习题答案都合法', bad === 0, bad);
   const pool = global.Kid.enReviewPool();
-  ok('每天一组 = 8 题', pool.length === 8, pool.length);
-  ok('一组里 单选5 + 多选2 + 判断1',
-    pool.filter(q => q.type === 'single').length === 5 &&
-    pool.filter(q => q.type === 'multi').length === 2 &&
+  /* 精简模式：6 道语法题（4 单选 + 1 多选 + 1 判断） */
+  ok('精简模式一组 = 6 题', pool.length === 6, pool.length);
+  ok('一组里 单选4 + 多选1 + 判断1',
+    pool.filter(q => q.type === 'single').length === 4 &&
+    pool.filter(q => q.type === 'multi').length === 1 &&
     pool.filter(q => q.type === 'judge').length === 1);
   /* 判断题要渲染成 对/错 两个选项 */
   ok('判断题选项是 对/错', pool.filter(q => q.type === 'judge')
