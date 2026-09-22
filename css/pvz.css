@@ -1,0 +1,921 @@
+/* ===========================================================
+   Micky 植物大战僵尸学习工作台
+   自定义样式：PVZ 原版画风（儿童端） + 马卡龙（妈妈端）
+   说明：所有样式都包在 .app-root 作用域下，
+        避免被 Tailwind CDN 运行时注入的样式覆盖。
+   =========================================================== */
+
+/* ---------- 全局基础 ---------- */
+.app-root * {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+.app-root {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Heiti SC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #3B2F1E;
+  min-height: 100vh;
+}
+
+/* 儿童端：蓝天草地背景 */
+.app-root.kid-mode {
+  background:
+    linear-gradient(180deg, #9BD9F0 0%, #C6EBF7 28%, #E7F6D8 28%, #D9F0B8 100%);
+  background-attachment: fixed;
+}
+
+/* 妈妈端：马卡龙柔和背景 */
+.app-root.parent-mode {
+  background: linear-gradient(160deg, #FDF1F5 0%, #F3EFFB 45%, #EDF7F3 100%);
+  background-attachment: fixed;
+}
+
+.app-shell {
+  max-width: 760px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+  padding-bottom: 96px; /* 给底部导航留位置 */
+}
+
+/* ---------- 顶部条 ---------- */
+.app-root .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.app-root.kid-mode .topbar {
+  background: linear-gradient(180deg, #6FBF2F 0%, #4E951C 100%);
+  border-bottom: 4px solid #3D7A16;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .12);
+}
+
+.app-root.parent-mode .topbar {
+  background: rgba(255, 255, 255, .82);
+  backdrop-filter: blur(10px);
+  border-bottom: 2px solid #F0E4EE;
+}
+
+.app-root .topbar .tb-title {
+  color: #fff;
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: .5px;
+  text-shadow: 2px 2px 0 #3D7A16, -2px 2px 0 #3D7A16, 2px -2px 0 #3D7A16, -2px -2px 0 #3D7A16;
+}
+
+.app-root.parent-mode .topbar .tb-title {
+  color: #6B5B78;
+  text-shadow: none;
+}
+
+.app-root .topbar .tb-sub {
+  color: #EAF7DC;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app-root.parent-mode .topbar .tb-sub {
+  color: #A998B8;
+}
+
+/* 端切换小胶囊 */
+.app-root .switch-pill {
+  border: none;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  min-height: 40px;
+  color: #fff;
+  background: linear-gradient(180deg, #FFD966 0%, #F5B21C 100%);
+  box-shadow: 0 3px 0 #C98A0B;
+}
+
+.app-root.parent-mode .switch-pill {
+  background: linear-gradient(180deg, #C9B6E4 0%, #A98FD1 100%);
+  box-shadow: 0 3px 0 #8B71B5;
+}
+
+.app-root .switch-pill:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #C98A0B;
+}
+
+/* ---------- 资源条（阳光 / 水滴 / 僵尸） ---------- */
+.app-root .resbar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 4px;
+}
+
+.app-root .res-chip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  background: #FFF8E4;
+  border: 3px solid #C9A961;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, .10);
+  min-height: 52px;
+}
+
+.app-root .res-chip .rc-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.app-root .res-chip .rc-val {
+  font-size: 20px;
+  font-weight: 900;
+  color: #B8791B;
+  line-height: 1;
+}
+
+.app-root .res-chip .rc-label {
+  font-size: 11px;
+  color: #A98B57;
+  font-weight: 700;
+}
+
+/* 僵尸进度 */
+.app-root .zombie-track {
+  margin: 8px 14px 0;
+  background: #F3E4C0;
+  border: 3px solid #C9A961;
+  border-radius: 16px;
+  padding: 8px 12px 10px;
+}
+
+.app-root .zombie-track .zt-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #8A6B3C;
+  margin-bottom: 6px;
+}
+
+.app-root .zt-steps {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.app-root .zt-step {
+  flex: 1;
+  height: 16px;
+  border-radius: 8px;
+  background: #E4D3AC;
+  border: 2px solid #C9A961;
+  position: relative;
+}
+
+.app-root .zt-step.on {
+  background: linear-gradient(180deg, #A8BE7A 0%, #7C8F52 100%);
+  border-color: #5F7340;
+}
+
+.app-root .zt-step.danger {
+  background: linear-gradient(180deg, #F08A6B 0%, #CF5B3C 100%);
+  border-color: #A8412A;
+}
+
+/* ---------- 木牌标题 ---------- */
+.app-root .wood-title {
+  display: inline-block;
+  background: linear-gradient(180deg, #A9713F 0%, #8B5E3C 100%);
+  color: #FFF3D6;
+  font-weight: 900;
+  font-size: 15px;
+  padding: 7px 18px;
+  border-radius: 12px;
+  border: 3px solid #6B4526;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, .18);
+  letter-spacing: 1px;
+}
+
+/* ---------- 卡片 ---------- */
+.app-root .card {
+  background: #F7EBD1;
+  border: 3px solid #C9A961;
+  border-radius: 18px;
+  padding: 12px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .10);
+}
+
+.app-root .card-cream {
+  background: #FFF8E4;
+}
+
+.app-root.parent-mode .card {
+  background: #FFFFFF;
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(160, 140, 180, .16);
+}
+
+.app-root .sec-title {
+  font-size: 15px;
+  font-weight: 900;
+  color: #6B4526;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-root.parent-mode .sec-title {
+  color: #6B5B78;
+}
+
+.app-root .muted {
+  color: #A08558;
+  font-size: 12px;
+}
+
+.app-root.parent-mode .muted {
+  color: #A998B8;
+}
+
+/* ---------- 大圆润按钮（低年级友好） ---------- */
+.app-root .btn {
+  border: none;
+  cursor: pointer;
+  border-radius: 999px;
+  font-weight: 900;
+  min-height: 54px;
+  padding: 12px 20px;
+  font-size: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform .06s;
+  font-family: inherit;
+  width: 100%;
+}
+
+.app-root .btn:active {
+  transform: translateY(3px);
+}
+
+.app-root .btn-green {
+  background: linear-gradient(180deg, #8FD44A 0%, #5BA82B 100%);
+  color: #fff;
+  box-shadow: 0 5px 0 #3D7A16;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, .25);
+}
+
+.app-root .btn-green:active {
+  box-shadow: 0 2px 0 #3D7A16;
+}
+
+.app-root .btn-sun {
+  background: linear-gradient(180deg, #FFE07A 0%, #F5B21C 100%);
+  color: #7A4E06;
+  box-shadow: 0 5px 0 #C98A0B;
+}
+
+.app-root .btn-sun:active {
+  box-shadow: 0 2px 0 #C98A0B;
+}
+
+.app-root .btn-wood {
+  background: linear-gradient(180deg, #B98452 0%, #8B5E3C 100%);
+  color: #FFF3D6;
+  box-shadow: 0 5px 0 #6B4526;
+}
+
+.app-root .btn-wood:active {
+  box-shadow: 0 2px 0 #6B4526;
+}
+
+.app-root .btn-ghost {
+  background: #FFF8E4;
+  color: #8A6B3C;
+  border: 3px solid #C9A961;
+  box-shadow: 0 4px 0 #D8BE8B;
+  min-height: 48px;
+  font-size: 15px;
+}
+
+.app-root .btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+/* 妈妈端马卡龙按钮 */
+.app-root.parent-mode .btn-mac {
+  background: linear-gradient(180deg, #FFC8D6 0%, #FFA9BF 100%);
+  color: #8B3A52;
+  box-shadow: 0 4px 0 #E87C97;
+  min-height: 48px;
+  font-size: 15px;
+}
+
+.app-root.parent-mode .btn-mac:active {
+  box-shadow: 0 2px 0 #E87C97;
+}
+
+.app-root.parent-mode .btn-mint {
+  background: linear-gradient(180deg, #BCEEDA 0%, #8FDCC0 100%);
+  color: #2F6B54;
+  box-shadow: 0 4px 0 #5FB693;
+  min-height: 48px;
+  font-size: 15px;
+}
+
+.app-root.parent-mode .btn-lav {
+  background: linear-gradient(180deg, #D6C8EE 0%, #B9A4DC 100%);
+  color: #5B4380;
+  box-shadow: 0 4px 0 #9279BC;
+  min-height: 48px;
+  font-size: 15px;
+}
+
+/* ---------- 任务卡 ---------- */
+.app-root .task-card {
+  background: #FFF8E4;
+  border: 3px solid #C9A961;
+  border-radius: 18px;
+  padding: 12px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .08);
+}
+
+.app-root .task-card.done {
+  background: #EAF7D2;
+  border-color: #7FA83F;
+}
+
+.app-root .task-card.waiting {
+  background: #FFF0D8;
+  border-color: #E0B25E;
+}
+
+.app-root .task-emoji {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 14px;
+  background: #FFF;
+  border: 3px solid #E2CFA4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.app-root .task-title {
+  font-weight: 900;
+  font-size: 16px;
+  color: #5C4322;
+  line-height: 1.25;
+}
+
+.app-root .task-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #F0E0BC;
+  color: #8A6B3C;
+  margin-top: 3px;
+}
+
+.app-root .task-tag.water {
+  background: #D6EFFB;
+  color: #2E7CA8;
+}
+
+.app-root .task-tag.ok {
+  background: #D8EFB8;
+  color: #4B7A16;
+}
+
+.app-root .task-tag.wait {
+  background: #FFE3B0;
+  color: #B8791B;
+}
+
+/* ---------- 草坪 ---------- */
+.app-root .lawn {
+  background: repeating-linear-gradient(90deg, #7CC142 0 50%, #6FB63A 50% 100%);
+  background-size: 40% 100%;
+  border: 5px solid #5A3D20;
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: inset 0 0 22px rgba(0, 0, 0, .22);
+}
+
+.app-root .lawn-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.app-root .cell {
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  border: 2px dashed rgba(255, 255, 255, .55);
+  background: rgba(255, 255, 255, .10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  padding: 2px;
+}
+
+.app-root .cell.has-plant {
+  border: 2px solid rgba(255, 255, 255, .8);
+  background: rgba(255, 255, 255, .18);
+}
+
+.app-root .cell.selected {
+  border: 3px solid #FFD54A;
+  box-shadow: 0 0 0 3px rgba(255, 213, 74, .5);
+}
+
+.app-root .cell svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 植物选择托盘 */
+.app-root .tray {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.app-root .tray-item {
+  flex: 1;
+  background: #FFF8E4;
+  border: 3px solid #C9A961;
+  border-radius: 16px;
+  padding: 6px 4px;
+  text-align: center;
+  cursor: pointer;
+  min-height: 84px;
+}
+
+.app-root .tray-item.active {
+  border-color: #FFD54A;
+  background: #FFF3CC;
+  box-shadow: 0 0 0 3px rgba(255, 213, 74, .45);
+}
+
+.app-root .tray-item.locked {
+  opacity: .5;
+}
+
+.app-root .tray-item svg {
+  width: 44px;
+  height: 44px;
+}
+
+.app-root .tray-price {
+  font-size: 12px;
+  font-weight: 900;
+  color: #B8791B;
+}
+
+/* ---------- 底部导航（大按钮） ---------- */
+.app-root .tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+}
+
+.app-root .tabbar-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  gap: 4px;
+  border-radius: 20px 20px 0 0;
+  padding: 6px 4px;
+}
+
+.app-root.kid-mode .tabbar-inner {
+  background: linear-gradient(180deg, #6FBF2F 0%, #4E951C 100%);
+  border-top: 4px solid #3D7A16;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, .18);
+}
+
+.app-root.parent-mode .tabbar-inner {
+  background: rgba(255, 255, 255, .94);
+  backdrop-filter: blur(10px);
+  border-top: 2px solid #F0E4EE;
+  box-shadow: 0 -4px 14px rgba(160, 140, 180, .18);
+}
+
+.app-root .tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 14px;
+  padding: 6px 2px;
+  min-height: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: #DFF3C8;
+  font-weight: 800;
+  font-size: 12px;
+  font-family: inherit;
+  position: relative;
+}
+
+.app-root .tab .tab-emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.app-root.kid-mode .tab.active {
+  background: rgba(255, 255, 255, .28);
+  color: #fff;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .6);
+}
+
+.app-root.parent-mode .tab {
+  color: #A998B8;
+}
+
+.app-root.parent-mode .tab.active {
+  background: #F6EFFA;
+  color: #7B5B9B;
+}
+
+.app-root .tab .badge {
+  position: absolute;
+  top: 2px;
+  right: 12px;
+  background: #FF5A5A;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  border-radius: 999px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 2px solid #fff;
+}
+
+/* ---------- 弹窗（故事化） ---------- */
+.app-root .modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 22, 10, .55);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn .18s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}
+
+@keyframes popIn {
+  0% { transform: scale(.82); opacity: 0 }
+  70% { transform: scale(1.04) }
+  100% { transform: scale(1); opacity: 1 }
+}
+
+.app-root .modal-box {
+  width: 100%;
+  max-width: 380px;
+  background: #FFF8E4;
+  border: 5px solid #C9A961;
+  border-radius: 24px;
+  padding: 20px 18px 16px;
+  text-align: center;
+  box-shadow: 0 10px 0 rgba(0, 0, 0, .22);
+  animation: popIn .26s cubic-bezier(.2, 1.4, .5, 1);
+  max-height: 86vh;
+  overflow-y: auto;
+}
+
+.app-root.parent-mode .modal-box {
+  background: #fff;
+  border: none;
+  box-shadow: 0 12px 32px rgba(120, 100, 150, .3);
+}
+
+.app-root .modal-emoji {
+  font-size: 54px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.app-root .modal-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: #6B4526;
+  margin-bottom: 8px;
+}
+
+.app-root .modal-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #7A5B33;
+  margin-bottom: 16px;
+  white-space: pre-line;
+}
+
+.app-root.parent-mode .modal-title { color: #6B5B78 }
+.app-root.parent-mode .modal-text { color: #7D6D8C }
+
+/* Toast */
+.app-root .toast-root {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 96px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.app-root .toast {
+  background: rgba(48, 36, 16, .92);
+  color: #FFF3D6;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  animation: toastIn .22s ease;
+}
+
+@keyframes toastIn {
+  from { transform: translateY(14px); opacity: 0 }
+  to { transform: translateY(0); opacity: 1 }
+}
+
+/* ---------- 妈妈端专用 ---------- */
+.app-root .stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.app-root .stat-box {
+  border-radius: 18px;
+  padding: 14px;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .10);
+}
+
+.app-root .stat-box .sb-val {
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.app-root .stat-box .sb-label {
+  font-size: 12px;
+  opacity: .95;
+  font-weight: 700;
+}
+
+.sb-pink { background: linear-gradient(135deg, #FFB7C5, #FF9DB1) }
+.sb-lav  { background: linear-gradient(135deg, #C9B6E4, #AF98D6) }
+.sb-mint { background: linear-gradient(135deg, #A8E6CF, #86D6B6) }
+.sb-lemon{ background: linear-gradient(135deg, #FFE3A3, #FFD06B); color: #8A6417 !important }
+.sb-sky  { background: linear-gradient(135deg, #A8D8EA, #86C4DE) }
+
+/* 柱状图 */
+.app-root .bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 150px;
+  padding: 8px 0 0;
+}
+
+.app-root .bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+}
+
+.app-root .bar {
+  width: 100%;
+  max-width: 34px;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(180deg, #FFD06B, #F5B21C);
+  min-height: 4px;
+}
+
+.app-root .bar.zero {
+  background: #EFE6F2;
+}
+
+.app-root .bar-label {
+  font-size: 11px;
+  color: #A998B8;
+  font-weight: 700;
+}
+
+.app-root .bar-val {
+  font-size: 11px;
+  font-weight: 900;
+  color: #B8791B;
+}
+
+/* 列表行 */
+.app-root .row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px dashed #EFE3F0;
+}
+
+.app-root .row:last-child { border-bottom: none }
+
+.app-root .row .row-main { flex: 1; min-width: 0 }
+
+.app-root .row .row-t {
+  font-weight: 800;
+  font-size: 14px;
+  color: #5B4B6B;
+}
+
+.app-root .row .row-s {
+  font-size: 11px;
+  color: #A998B8;
+  margin-top: 2px;
+}
+
+.app-root .pill-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  min-height: 40px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.pill-ok { background: #BCEEDA; color: #2F6B54 }
+.pill-no { background: #FFD9DE; color: #A8435B }
+.pill-lav { background: #E4DAF5; color: #5B4380 }
+.pill-gray { background: #F1ECF5; color: #8E7FA0 }
+
+/* 表单 */
+.app-root .field {
+  width: 100%;
+  border: 2px solid #EADFF0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  background: #FCFAFE;
+  color: #5B4B6B;
+  min-height: 48px;
+}
+
+.app-root .field:focus { outline: 2px solid #C9B6E4; border-color: #C9B6E4 }
+
+.app-root .field-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #8E7FA0;
+  margin: 10px 0 5px;
+  display: block;
+}
+
+/* 空状态 */
+.app-root .empty {
+  text-align: center;
+  padding: 26px 16px;
+  color: #B0A0BC;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.app-root .empty .e-emoji { font-size: 40px; display: block; margin-bottom: 8px }
+
+/* 分段控件 */
+.app-root .seg {
+  display: flex;
+  background: #F3EDF8;
+  border-radius: 14px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.app-root .seg button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  border-radius: 11px;
+  padding: 9px 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #8E7FA0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.app-root .seg button.on {
+  background: #fff;
+  color: #7B5B9B;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
+}
+
+/* 小工具 */
+.app-root .hr { height: 1px; background: #EFE3F0; margin: 12px 0 }
+.app-root .mt8 { margin-top: 8px }
+.app-root .mt12 { margin-top: 12px }
+.app-root .mt16 { margin-top: 16px }
+.app-root .flex { display: flex }
+.app-root .gap8 { gap: 8px }
+.app-root .w-full { width: 100% }
+.app-root .text-c { text-align: center }
+
+/* 奖励商店 */
+.app-root .shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.app-root .shop-item {
+  background: #FFF8E4;
+  border: 3px solid #C9A961;
+  border-radius: 18px;
+  padding: 12px 10px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .08);
+}
+
+.app-root .shop-item.can { border-color: #F5B21C; background: #FFF3CC }
+
+.app-root .shop-item .si-emoji { font-size: 34px; line-height: 1 }
+.app-root .shop-item .si-name { font-weight: 900; font-size: 13px; color: #5C4322; margin-top: 4px }
+.app-root .shop-item .si-price {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #B8791B;
+  background: #FFE9B0;
+  border-radius: 999px;
+  padding: 4px 0;
+}
+
+/* 语文生字选项：选中态（孩子看得见自己选了哪个） */
+.cn-opt { transition: transform .12s, background .12s, border-color .12s; user-select:none; -webkit-tap-highlight-color:transparent; }
+.cn-opt:active { transform: scale(.94); }
+.cn-opt.on { background: #FFD54A !important; border-color: #E8A317 !important; color:#4A3410 !important; box-shadow: 0 3px 0 #C98C10; transform: scale(1.04); }
+
+/* 课文批注角标 */
+.cn-note-w { color:#B07A2E; border-bottom:2px dotted #D9A441; }
+.cn-note-w sup { font-size:10px; background:#8B5E3C; color:#fff; border-radius:8px; padding:1px 4px; margin-left:1px; }
+/* 倒计时 */
+.timer-tick { font-variant-numeric: tabular-nums; }
+/* 选项选中态（造句/概括也用） */
+.cn-opt.on { background:#FFD54A !important; border-color:#E8A317 !important; color:#4A3410 !important; }
