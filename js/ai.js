@@ -236,6 +236,74 @@
     },
     localNote: localNote,
 
+    /* ---------- 妈妈端「今日表扬」AI 润色 ---------- */
+    praise: function (dayData, cfg) {
+      var fixedDone = (dayData.fixed && dayData.fixed.list || []).filter(function (t) {
+        return t.status === 'approved';
+      }).map(function (t) { return t.title; });
+      var SYS = '你是' + (cfg.kidName || 'Micky') + '的妈妈的朋友，很会夸孩子。孩子是个二年级、双鱼座、心思细、高敏感的男孩。\n' +
+        '请基于孩子今天的真实完成情况，给妈妈写「可以直接说出口」的夸奖话。要求：\n' +
+        '1）夸努力、夸看得见的具体行为，绝不夸「聪明/厉害」这类空词；\n' +
+        '2）每句都要点到一个具体行为（如「你今天练字坐满了十分钟」「你今天把错题记下来了」）；\n' +
+        '3）语气温暖、像妈妈平时说话，不搞怪、不煽情；\n' +
+        '4）严格输出 JSON：{"lines":["夸奖1","夸奖2","夸奖3"],"tip":"一句给妈妈的话术提醒（怎么夸更有效）"}，不要多余文字。';
+      var base = (cfg.baseUrl || 'https://api.deepseek.com/v1').replace(/\/+$/, '');
+      return fetch(base + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+        body: JSON.stringify({
+          model: cfg.model || 'deepseek-chat',
+          messages: [
+            { role: 'system', content: SYS },
+            { role: 'user', content: '今天数据：固定任务通过=' + JSON.stringify(fixedDone) +
+              '；讲述=' + JSON.stringify(dayData.speech.map(function (x) { return x.score; })) +
+              '；朗文题=' + JSON.stringify(dayData.quiz.map(function (x) { return (x.correct || 0) + '/' + (x.total || 0); })) +
+              '；阅读=' + dayData.read.length + ' 次。请生成。' }
+          ],
+          temperature: 0.8
+        })
+      }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (j) {
+          var raw = (j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+          var m = raw.match(/\{[\s\S]*\}/);
+          if (!m) throw new Error('返回格式异常');
+          var o = JSON.parse(m[0]);
+          return { lines: Array.isArray(o.lines) ? o.lines : [], tip: o.tip || '' };
+        });
+    },
+
+    /* ---------- 妈妈端「本周成长周报」AI 润色 ---------- */
+    weekly: function (weekData, cfg) {
+      var SYS = '你是家庭教育观察者，文字温柔、理性又走心。孩子二年级、双鱼座、高敏感。\n' +
+        '请基于本周理性数据，先如实总结，再写成「从数据到成长」的感性观察，最后给妈妈 3 条今晚怎么跟孩子聊的具体话术。\n' +
+        '要求：不煽情、不夸大、不说教；话术要妈妈能直接照着说。\n' +
+        '严格输出 JSON：{"rational":"理性数据总结一句话","grow":"感性成长观察一段","talk":["话术1","话术2","话术3"]}，不要多余文字。';
+      var base = (cfg.baseUrl || 'https://api.deepseek.com/v1').replace(/\/+$/, '');
+      return fetch(base + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+        body: JSON.stringify({
+          model: cfg.model || 'deepseek-chat',
+          messages: [
+            { role: 'system', content: SYS },
+            { role: 'user', content: '本周数据：' + JSON.stringify({
+              fullDays: weekData.fullDays, spCount: weekData.spCount, spAvg: weekData.spAvg,
+              qPct: weekData.qPct, rdDays: weekData.rdDays, water: weekData.water
+            }) + '。请生成周报。' }
+          ],
+          temperature: 0.85
+        })
+      }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (j) {
+          var raw = (j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+          var m = raw.match(/\{[\s\S]*\}/);
+          if (!m) throw new Error('返回格式异常');
+          var o = JSON.parse(m[0]);
+          return { rational: o.rational || '', grow: o.grow || '', talk: Array.isArray(o.talk) ? o.talk : [] };
+        });
+    },
+
+
     /* 统一入口：返回 Promise */
     score: function (text, cfg) {
       cfg = cfg || {};
