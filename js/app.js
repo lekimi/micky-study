@@ -25,11 +25,17 @@
         '</div>';
     },
 
-    render: function () {
+    /* toTop=true 才回到顶部（切换一级页面/切换端时用）；
+       平时保持原来的滚动位置 —— 否则每点一个按钮都被弹回页顶，很不好操作。 */
+    render: function (toTop) {
+      var y = 0;
+      if (toTop !== true) {
+        try { y = global.pageYOffset || global.scrollY || document.documentElement.scrollTop || 0; } catch (e) { y = 0; }
+      }
       document.body.className = 'app-root ' + (App.mode === 'kid' ? 'kid-mode' : 'parent-mode');
       var body = App.mode === 'kid' ? global.Kid.render() : global.Parent.render();
       document.getElementById('app').innerHTML = App.topbar() + body;
-      window.scrollTo(0, 0);
+      try { global.scrollTo(0, y); } catch (e) { }
     },
 
     save: function () { S.save(); },
@@ -40,6 +46,43 @@
       S.save();
       App.render();
       App.flushFlash();
+    },
+
+    /* 全局使用时长心跳：每 10 秒记一次，满 30 分钟就锁屏（妈妈可加时）
+       ⚠️ 每日固定任务「打卡倒计时」进行中时不计时 —— 那是任务本身，不算玩 */
+    appTick: function () {
+      if (App.mode !== 'kid') return;
+      if (!S.appConf().enable) return;
+      if (App.fixedTiming()) return;          // 正在打卡任务 → 不计时
+      App._appTick = (App._appTick || 0) + 1;
+      if (App._appTick < 10) return;          // 10 秒记一次
+      App._appTick = 0;
+
+      var date = S.dateStr();
+      var wasUp = S.appTimeUp(date);
+      S.appAddSec(10, date);
+      if (!wasUp && S.appTimeUp(date)) {
+        S.save();
+        U.story('appTimeUp');
+        App.render();
+        return;
+      }
+      if (App._appSave === undefined) App._appSave = 0;
+      App._appSave++;
+      if (App._appSave >= 6) { App._appSave = 0; S.save(); }   // 每分钟落盘
+    },
+
+    /* 是否正在进行每日固定任务的打卡倒计时 */
+    fixedTiming: function () {
+      try {
+        if (!global.Kid || !global.Kid.timerOf) return false;
+        var list = global.Store.fixedTasksOf(global.Store.dateStr()) || [];
+        for (var i = 0; i < list.length; i++) {
+          var tm = global.Kid.timerOf(list[i].id);
+          if (tm && Date.now() < tm.end) return true;
+        }
+      } catch (e) { }
+      return false;
     },
 
     /* 暖心小功能的心跳：① 三项固定任务全完成 → 自动给小盆栽浇水
@@ -161,7 +204,10 @@
 
         if (rerender) {
           S.save();
-          App.render();
+          /* 只有「切换一级页面 / 切换端」才回顶部，其余保持位置 */
+          var isSwitch = (act === 'tab' || act === 'ptab' ||
+            act === 'gotoKid' || act === 'gotoParent' || act === 'cnTab');
+          App.render(isSwitch);
           App.flushFlash();
         }
       });
@@ -206,6 +252,8 @@
     try { if (global.MathGame) global.MathGame.tick(); } catch (e) { }
     /* 妈妈的急件：最多 1 秒后就弹到孩子面前 */
     try { if (App.mode === 'kid') App.warmTick(); } catch (e) { }
+    /* 全局使用时长（每日固定任务打卡期间不计时） */
+    try { App.appTick(); } catch (e) { }
   }, 1000);
 
   if (document.readyState === 'loading') {
