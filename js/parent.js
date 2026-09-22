@@ -417,7 +417,9 @@
         '<button class="pill-btn ' + (s.ai && s.ai.enabled ? 'pill-ok' : 'pill-gray') + '" data-act="toggleAI">' +
         ((s.ai && s.ai.enabled) ? '已开启' : '已关闭') + '</button></div>' +
         '<div class="row"><div class="row-main"><div class="row-t">⏰ 倒计时语音提醒</div>' +
-        '<div class="row-s">练字 / 计算快到时，语音 + 音乐提醒他</div></div>' +
+        '<div class="row-s">' + ((s.sound && s.sound.on && s.sound.muteDate === S.dateStr())
+          ? '他今天自己按了「今天都不再响」，明天自动恢复'
+          : '练字 / 计算快到时，语音 + 音乐提醒他') + '</div></div>' +
         '<button class="pill-btn ' + (s.sound && s.sound.on ? 'pill-ok' : 'pill-gray') + '" data-act="voiceToggle">' +
         ((s.sound && s.sound.on) ? '已开启' : '已关闭') + '</button></div>' +
         '<button class="btn btn-lav mt8" data-act="aiConfig">配置 AI 老师参数</button>' +
@@ -915,8 +917,12 @@
       }
 
       if (name === 'voiceToggle') {
-        if (!s.sound) s.sound = { on: 1 };
+        if (!s.sound) s.sound = { on: 1, muteDate: '' };
         s.sound.on = s.sound.on ? 0 : 1;
+        if (s.sound.on) {
+          s.sound.muteDate = '';              /* 重新打开 = 取消「今天都不响」 */
+          if (global.Sound) global.Sound.unmute();
+        }
         S.save();
         U.toast(s.sound.on ? '倒计时语音提醒已开' : '倒计时语音提醒已关');
         return true;
