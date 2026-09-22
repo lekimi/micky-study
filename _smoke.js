@@ -594,6 +594,32 @@ ok('倒计时 · 到点没有提前奖励', global.Kid.earlyMinutes('TEST') === 
 delete global.Store.state.timers[global.Kid.timerKey('TEST')];
 ok('倒计时 · 未启动显示开始按钮', global.Kid.timerHtml('TEST', 10).indexOf('开始计时') > 0);
 
+/* ---- 提醒响起来之后要有「别说了」的出口 ---- */
+(function () {
+  const SD = global.Sound, K = global.Kid;
+  ok('Sound 模块已加载', !!SD);
+  ok('没在响时不显示停止条', K.soundStopBar() === '');
+  /* 假装正在响（Node 里没有 speechSynthesis，直接替掉判定） */
+  const realPlaying = SD.isPlaying;
+  SD.isPlaying = function () { return true; };
+  const bar = K.soundStopBar();
+  ok('响着的时候顶部出现停止条', bar.indexOf('提醒正在响') > 0);
+  ok('停止条有「停，别说了」按钮', bar.indexOf('data-act="soundStop"') > 0);
+  ok('停止条有「今天都不再响」按钮', bar.indexOf('data-act="soundMuteToday"') > 0);
+  ok('两个按钮都够大（≥52px）', (bar.match(/min-height:5[2-9]px/g) || []).length >= 2);
+  SD.isPlaying = realPlaying;
+  /* 停止 / 静音 真能改状态 */
+  ok('点「别说了」不报错且停下来了', K.act('soundStop') === true && SD.isPlaying() === false);
+  ok('默认开着语音提醒', SD.on() === true);
+  K.act('soundMuteToday');
+  ok('按「今天都不再响」后今天静音', SD.on() === false);
+  ok('静音写进了 state（明天自动失效）', S.state.sound.muteDate === S.dateStr());
+  S.state.sound.muteDate = '2000-01-01';       // 假装是昨天按的
+  ok('换了一天就自动恢复', SD.on() === true);
+  S.state.sound.muteDate = '';
+  S.save();
+})();
+
 // ---- 计算小超市：提前完成按剩余分钟发水滴 ----
 (function () {
   /* 今天的固定任务前面已经全做完了，这里用另一个 slot（平日/周末）的计算任务来测，避免被判重复 */
