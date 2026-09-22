@@ -251,11 +251,12 @@
       /* 精简模式（减少屏幕使用）：关掉字词类练习和朗文阅读题，只留最该在屏幕上做的 */
       lean: {
         on: 1,           // 1 = 精简（默认开）
-        noChars: 1,      // 去掉「生字闯关」
-        noPreview: 1,    // 去掉「预习探险」
+        noChars: 1,      // 去掉「生字闯关」（字词在纸质教辅上写更好）
+        noPreview: 0,    // ⚠️ 预习探险要保留：它是「课文理解」向的，不是字词
         noReading: 1,    // 去掉「朗文阅读题」
         enReviewN: 6,    // 朗文 2A 复习题只出 6 道
-        listenSeq: 1     // 听力按 L1、L2… 顺序播放（孩子在纸质卷子上做）
+        listenSeq: 1,    // 听力按 L1、L2… 顺序播放（孩子在纸质卷子上做）
+        afterTasks: 1    // 「先做完正事」：三项固定任务没完成时，锁住其它板块
       },
       appUse: {},                // 全局计时 {'2026-09-22': 已用秒数}
       myTasks: [],               // 孩子自加任务 {id,subject,title,date,status,water,note,at,reviewedAt}
